@@ -13,8 +13,8 @@ function trafficSimulation()
     %% initialize car positions and velocities
     cars_1 = zeros(2*numCars, 1);
     cars_2 = zeros(2*numCars, 1);
-    v0_base1 = 0.8815;
-    v0_base2 = 0.8814;
+    v0_base1 = 0.89;
+    v0_base2 = 0.889;
     
     for i = 1:numCars
         cars_1(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
@@ -25,17 +25,17 @@ function trafficSimulation()
     end
     
     options = odeset('AbsTol',10^-8,'RelTol',10^-8);
-     tic;
-     [t1,allTime_1] = ode45(@microsystem,[0 finalTime],[cars_1; v0_base1],options);
-     ref_1 = allTime_1(end,:)';
-     [t2,allTime_2] = ode45(@microsystem,[0 finalTime],[cars_2; v0_base2],options);
-     ref_2 = allTime_2(end,:)';
-     toc;
+%      tic;
+%      [t1,allTime_1] = ode45(@microsystem,[0 finalTime],[cars_1; v0_base1],options);
+%      ref_1 = allTime_1(end,:)';
+%      [t2,allTime_2] = ode45(@microsystem,[0 finalTime],[cars_2; v0_base2],options);
+%      ref_2 = allTime_2(end,:)';
+%      toc;
     
-      save('refStats.mat','ref_1','ref_2');
+%     save('refStats.mat','ref_1','ref_2');
+      load('refStats.mat','ref_1','ref_2');
       std(getHeadways(ref_1(1:numCars)))
       std(getHeadways(ref_2(1:numCars)))
-%      load('refStats.mat','ref_1','ref_2');
     
     %% plot the results
 %     hEnd = getHeadways(allTime_2(end,1:numCars)');
@@ -60,6 +60,7 @@ function trafficSimulation()
     thingLabel = zeros(1,500);
     
     for iEq=1:steps
+        iEq
         sigma_1 = std(getHeadways(ref_1(1:numCars)));
         sigma_2 = std(getHeadways(ref_2(1:numCars)));
         w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];
@@ -68,7 +69,7 @@ function trafficSimulation()
         %% Newton and that other guy's method
         u = newGuess;
         f = F(ref_2, u(2),u(1));
-        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
+        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2)) - stepSize;
         k=1;
         tolerance = .001;
         
@@ -81,7 +82,7 @@ function trafficSimulation()
             f = F(ref_2, u(2),u(1));
             fprintf('f is %f \n', f)
             Df = jacobian(ref_2, u(1), u(2), w);
-            neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2))
+            neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2)) - stepSize
             u = u - Df^(-1)*[f;w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2))]
             k = k + 1;
         end
@@ -161,16 +162,33 @@ function trafficSimulation()
     end
     
     %% optimal velocity function given in paper
+    %    h         -  a parameter to represent the optimal velocity of the
+    %               	car 
+    %    headway   - the distance between this car and the car ahead of it
+    %    v0        - ideal goal speed of each driver
+    %    returns:
+    %    v         - the optimal velocity of this car, who will speed or slow to try
+    %                   to meet it
     function v = optimalVelocity(headway,v0)
         v = v0 * (tanh(headway - h) + tanh(h));
     end
-
+    %% function to calculate headways of car vector
+    %  v   - column vector of the cars' positions
+    %  returns:
+    %  hways - column vector of cars' headways
     function hways = getHeadways(v)
         futureCars = circshift(v,[-1,0]);
         hways = mod(futureCars - v, len);
     end
 
     %% ODE that governs individual cars
+    % Governs the movement of the individual cars (microvariables)
+    % ~         - dummy parameter for time, to allow use in ode45
+    % params    - a column vector of the distribution of the cars and their
+    %               velocities, of size 2*numCars.  The position of car i
+    %               and its velocity are given at num params(i), 
+    %               params(i + numcars)
+    %             
     function u = microsystem(~,params)
         invT = 1.7;
         colCars = params(1:(end - 1));
