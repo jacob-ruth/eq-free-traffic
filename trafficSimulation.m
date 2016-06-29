@@ -13,8 +13,8 @@ function trafficSimulation()
     %% initialize car positions and velocities
     cars_1 = zeros(2*numCars, 1);
     cars_2 = zeros(2*numCars, 1);
-    v0_base1 = 0.89;
-    v0_base2 = 0.8898;
+    v0_base1 = 0.8815;
+    v0_base2 = 0.8814;
     
     for i = 1:numCars
         cars_1(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
@@ -25,15 +25,17 @@ function trafficSimulation()
     end
     
     options = odeset('AbsTol',10^-8,'RelTol',10^-8);
-% %     tic;
-%      [t1,allTime_1] = ode45(@microsystem,[0 finalTime],[cars_1; v0_base1],options);
-%      ref_1 = allTime_1(end,:)';
-%      [t2,allTime_2] = ode45(@microsystem,[0 finalTime],[cars_2; v0_base2],options);
-%      ref_2 = allTime_2(end,:)';
-% %     toc;
-%     
-%      save('refStats.mat','t1','allTime_1','ref_1','t2','allTime_2','ref_2');
-     load('refStats.mat','ref_1','ref_2');
+     tic;
+     [t1,allTime_1] = ode45(@microsystem,[0 finalTime],[cars_1; v0_base1],options);
+     ref_1 = allTime_1(end,:)';
+     [t2,allTime_2] = ode45(@microsystem,[0 finalTime],[cars_2; v0_base2],options);
+     ref_2 = allTime_2(end,:)';
+     toc;
+    
+      save('refStats.mat','ref_1','ref_2');
+      std(getHeadways(ref_1(1:numCars)))
+      std(getHeadways(ref_2(1:numCars)))
+%      load('refStats.mat','ref_1','ref_2');
     
     %% plot the results
 %     hEnd = getHeadways(allTime_2(end,1:numCars)');
@@ -50,46 +52,85 @@ function trafficSimulation()
 %     plot(t, s);
     
     %% initialize secant continuation
-    sigma_1 = std(getHeadways(ref_1(1:numCars)));
-    sigma_2 = std(getHeadways(ref_2(1:numCars)));
-    w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];
-    newGuess = [sigma_2; v0_base2] + stepSize *(w/norm(w));
+    steps = 200;
+    bif = zeros(2,steps);
     
-    %% Newton and that other guy's method
-    u = newGuess;
-    for k=1:10
-        fprintf('starting iteration %f \n', k);
+    allOfTheThings = zeros(2*numCars, 500);
+    thingCounter = 1;
+    thingLabel = zeros(1,500);
+    
+    for iEq=1:steps
+        sigma_1 = std(getHeadways(ref_1(1:numCars)));
+        sigma_2 = std(getHeadways(ref_2(1:numCars)));
+        w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];
+        newGuess = [sigma_2; v0_base2] + stepSize *(w/norm(w));
+
+        %% Newton and that other guy's method
+        u = newGuess;
         f = F(ref_2, u(2),u(1));
-        fprintf('f is %f \n', f)
-        Df = jacobian(ref_2, u(1), u(2), w);
-        u = u - Df^(-1)*[f;w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2))]
+        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
+        k=1;
+        tolerance = .001;
+        
+        while((abs(f)>tolerance || abs(neww)>tolerance) && k < 20)
+            u
+            thingLabel(thingCounter) = k;
+            [~,allOfTheThings(:,thingCounter)] = ler(u(1),ref_2,tskip+delta,1,u(2));
+            thingCounter = 1 + thingCounter;
+            fprintf('starting iteration %f \n', k);
+            f = F(ref_2, u(2),u(1));
+            fprintf('f is %f \n', f)
+            Df = jacobian(ref_2, u(1), u(2), w);
+            neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2))
+            u = u - Df^(-1)*[f;w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2))]
+            k = k + 1;
+        end
+        
+        bif(:,iEq) = u;
+
+        ref_1 = ref_2;
+        sigma_1 = sigma_2;
+        v0_base1 = v0_base2;
+        v0_base2 = u(2);
+        [sigma_2,ref_2] = ler(u(1),ref_1,tskip+delta,1,u(2));
+        allOfTheThings(:,thingCounter) = ref_2;
+        thingCounter = 1 + thingCounter;
     end
     
-    %% lift and evolve to relatively steady state
-    init = getHeadways(ref_1(1:numCars)); %init is headways
-    new_s = 100000;
-    olds = 0;
-    while(abs(new_s - olds) > .01)
-        l = lift(.15, 1, init, v0_base1);
-        olds = std(init);
-        [t,evolved] = ode45(@microsystem,[0 tskip+delta],[l;v0_base1],options);
-        evolved = evolved(end,:)';
-        init = getHeadways(evolved(1:numCars));
-        new_s = std(init);
-    end
+    save('things.mat','allOfTheThings','thingLabel');
     
     figure;
+    scatter(bif(2,:),bif(1,:),'*');
+    
+    %% lift and evolve to relatively steady state
+%     init = getHeadways(ref_1(1:numCars)); %init is headways
+%     new_s = 100000;
+%     olds = 0;
+%     while(abs(new_s - olds) > .01)
+%         l = lift(.15, 1, init, v0_base1);
+%         olds = std(init);
+%         [t,evolved] = ode45(@microsystem,[0 tskip+delta],[l;v0_base1],options);
+%         evolved = evolved(end,:)';
+%         init = getHeadways(evolved(1:numCars));
+%         new_s = std(init);
+%     end
+%     
+%     figure;
 %     hold on
 %     plot(1:1:numCars,getHeadways(ref_1(1:numCars)),'or')
 %     plot(1:1:numCars,init,'xb')
 %     plot(1:1:numCars,getHeadways(l(1:numCars)),'*g')
-    hold off
+%     hold off
     
-    function out = ler(sigma,ref,t,p,v0)
+    %% lift, evolve, restrict
+    function [sigma,new_state] = ler(sigma,ref,t,p,v0)
         lifted = lift(sigma, p, getHeadways(ref(1:numCars)),v0);
-        [~,evo] = ode45(@microsystem,[0 t],[lifted;v0],options);
-        evo = evo(end, 1:numCars)';
-        out = std(getHeadways(evo));
+         [~,evo] = ode45(@microsystem,[0 t],[lifted;v0],options);
+         evoCars = evo(end, 1:numCars)';
+         sigma = std(getHeadways(evoCars));
+         if(nargout >1)
+             new_state = evo(end,1:2*numCars)';
+         end
     end
     
     function dif = F(ref, sigma,v0)
