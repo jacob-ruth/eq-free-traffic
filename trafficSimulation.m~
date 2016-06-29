@@ -13,7 +13,10 @@ function trafficSimulation()
     %% initialize car positions and velocities
     cars_1 = zeros(2*numCars, 1);
     cars_2 = zeros(2*numCars, 1);
+<<<<<<< HEAD
+=======
 
+>>>>>>> origin/NewtonSolver
     v0_base1 = 0.91;
     v0_base2 = 0.9;
     
@@ -32,13 +35,20 @@ function trafficSimulation()
 %      [t2,allTime_2] = ode45(@microsystem,[0 finalTime],[cars_2; v0_base2],options);
 %      ref_2 = allTime_2(end,:)';
 %      toc;
+<<<<<<< HEAD
+    
+%     save('refStats.mat','ref_1','ref_2');
+      load('refStats919.mat','ref_1','ref_2');
+      std(getHeadways(ref_1(1:numCars)))
+      std(getHeadways(ref_2(1:numCars)))
+=======
 
 %     
 %       save('refStats.mat','ref_1','ref_2');
 %       std(getHeadways(ref_1(1:numCars)))
 %       std(getHeadways(ref_2(1:numCars)))
       load('refStats919.mat','ref_1','ref_2');
-
+>>>>>>> origin/NewtonSolver
     
     %% plot the results
 %     hEnd = getHeadways(allTime_2(end,1:numCars)');
@@ -72,27 +82,24 @@ function trafficSimulation()
         %% Newton and that other guy's method
         u = newGuess;
         firstGuess = u
-        f = F(ref_2, u(1),u(2));
+        f = F(ref_2, u(2),u(1));
         neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
         k=1;
         tolerance = 10^(-6);
         
-%{         
         while((abs(f)>tolerance || abs(neww)>tolerance) && k < 20)
             thingLabel(thingCounter) = k;
             [~,allOfTheThings(:,thingCounter)] = ler(u(1),ref_2,tskip+delta,1,u(2));
             thingCounter = 1 + thingCounter;
             fprintf('starting iteration %f \n', k);
-            f = F(ref_2, u(1),u(2));
+            f = F(ref_2, u(2),u(1));
             fprintf('f is %f \n', f)
             Df = jacobian(ref_2, u(1), u(2), w);
             neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2))
             u = u - Df^(-1)*[f;w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2))]
+>>>>>>> Stashed changes
             k = k + 1;
         end
-    %}
-        
-        u = fsolve(@(u)FW(u,ref_2,w,newGuess), newGuess);
         
         bif(:,iEq) = u;
 
@@ -109,12 +116,6 @@ function trafficSimulation()
     
     figure;
     scatter(bif(2,:),bif(1,:),'*');
-    
-    function fw = FW(u,ref,W,newGuess)
-        fw = zeros(2,1);
-        fw(1) = F(ref,u(1),u(2));
-        fw(2) = W(1)*(u(1)-newGuess(1)) + W(2)*(u(2) - newGuess(2));
-    end
     
     %% lift and evolve to relatively steady state
 %     init = getHeadways(ref_1(1:numCars)); %init is headways
