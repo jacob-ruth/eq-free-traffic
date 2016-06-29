@@ -13,6 +13,10 @@ function trafficSimulation()
     %% initialize car positions and velocities
     cars_1 = zeros(2*numCars, 1);
     cars_2 = zeros(2*numCars, 1);
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/NewtonSolver
     v0_base1 = 0.91;
     v0_base2 = 0.9;
     
@@ -31,11 +35,20 @@ function trafficSimulation()
 %      [t2,allTime_2] = ode45(@microsystem,[0 finalTime],[cars_2; v0_base2],options);
 %      ref_2 = allTime_2(end,:)';
 %      toc;
+<<<<<<< HEAD
     
 %     save('refStats.mat','ref_1','ref_2');
       load('refStats919.mat','ref_1','ref_2');
       std(getHeadways(ref_1(1:numCars)))
       std(getHeadways(ref_2(1:numCars)))
+=======
+
+%     
+%       save('refStats.mat','ref_1','ref_2');
+%       std(getHeadways(ref_1(1:numCars)))
+%       std(getHeadways(ref_2(1:numCars)))
+      load('refStats919.mat','ref_1','ref_2');
+>>>>>>> origin/NewtonSolver
     
     %% plot the results
 %     hEnd = getHeadways(allTime_2(end,1:numCars)');
