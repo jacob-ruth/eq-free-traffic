@@ -35,9 +35,10 @@ function trafficSimulation()
     
 %     save('refStats.mat','ref_1','ref_2');
       load('refStats919.mat','ref_1','ref_2');
-      std(getHeadways(ref_1(1:numCars)))
-      std(getHeadways(ref_2(1:numCars)))
-
+     % std(getHeadways(ref_1(1:numCars)))
+     % std(getHeadways(ref_2(1:numCars)))
+    %load('things.mat', 'allOfTheThings');
+    %std(getHeadways(allOfTheThings(1:numCars, 100)))
 %     
 %       save('refStats.mat','ref_1','ref_2');
 %       std(getHeadways(ref_1(1:numCars)))
@@ -75,10 +76,10 @@ function trafficSimulation()
 
         %% Newton and that other guy's method
         u = newGuess;
-        f = F(ref_2, u(2),u(1));
-        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2)) - stepSize;
+        f = F(ref_2, u(1),u(2));
+        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
         k=1;
-        tolerance = .001;
+        tolerance = 1 * 10^(-7);
         
         while((abs(f)>tolerance || abs(neww)>tolerance) && k < 20)
             u
@@ -86,10 +87,10 @@ function trafficSimulation()
             [~,allOfTheThings(:,thingCounter)] = ler(u(1),ref_2,tskip+delta,1,u(2));
             thingCounter = 1 + thingCounter;
             fprintf('starting iteration %f \n', k);
-            f = F(ref_2, u(2),u(1));
+            f = F(ref_2, u(1),u(2));
             fprintf('f is %f \n', f)
             Df = jacobian(ref_2, u(1), u(2), w);
-            neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2)) - stepSize;
+            neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
             u = u - Df^(-1)*[f;neww];
             k = k + 1;
         end
@@ -105,7 +106,7 @@ function trafficSimulation()
         thingCounter = 1 + thingCounter;
     end
     
-    save('things.mat','allOfTheThings','thingLabel');
+    save('things.mat','allOfTheThings','thingLabel', bif);
     
     figure;
     scatter(bif(2,:),bif(1,:),'*');
