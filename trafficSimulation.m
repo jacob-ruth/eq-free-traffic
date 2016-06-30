@@ -14,8 +14,11 @@ function trafficSimulation()
     cars_1 = zeros(2*numCars, 1);
     cars_2 = zeros(2*numCars, 1);
 
-    v0_base1 = 0.91;
-    v0_base2 = 0.9;
+    origv01 = 0.91;
+    origv02 = 0.9;
+    
+    v0_base1 = origv01;
+    v0_base2 = origv02;
     
     for i = 1:numCars
         cars_1(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
@@ -58,31 +61,38 @@ function trafficSimulation()
     
     allOfTheThings = zeros(2*numCars, 500);
     thingCounter = 1;
-    thingLabel = zeros(1,500);
+    thingLabel = zeros(1,500)
+    
+    sigma_1 = std(getHeadways(ref_1(1:numCars)));
+    sigma_2 = std(getHeadways(ref_2(1:numCars)));
+    
     for iEq=1:steps
         iEq
-        sigma_1 = std(getHeadways(ref_1(1:numCars)));
-        sigma_2 = std(getHeadways(ref_2(1:numCars)));
         w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];
         newGuess = [sigma_2; v0_base2] + stepSize *(w/norm(w));
 
         %% Newton and that other guy's method
         u = newGuess;
+        firstGuess = u;
         f = F(ref_2, u(1),u(2));
         neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
         k=1;
+        
         while((abs(f)>tolerance || abs(neww)>tolerance) && k < 20)
-            thingLabel(thingCounter) = k;
-            [~,allOfTheThings(:,thingCounter)] = ler(u(1),ref_2,tskip+delta,1,u(2));
-            thingCounter = 1 + thingCounter;
-            fprintf('starting iteration %f \n', k);
+%             fprintf('starting iteration %f \n', k)
             f = F(ref_2, u(1),u(2));
-            fprintf('f is %f \n', f)
+%             fprintf('f is %d \n', f);
             Df = jacobian(ref_2, u(1), u(2), w);
             neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
+
             u = u - Df^(-1)*[f;neww];
             k = k + 1;
         end        
+        u
+        
+%         u = fsolve(@(u)FW(u,ref_2,w,newGuess), newGuess);
+        
+>>>>>>> Stashed changes
         bif(:,iEq) = u;
 
         ref_1 = ref_2;
@@ -90,11 +100,13 @@ function trafficSimulation()
         v0_base1 = v0_base2;
         v0_base2 = u(2);
         [sigma_2,ref_2] = ler(u(1),ref_1,tskip+delta,1,u(2));
-        allOfTheThings(:,thingCounter) = ref_2;
-        thingCounter = 1 + thingCounter;
     end
     
+
     save('normDeltathings.mat','allOfTheThings','thingLabel');
+
+    save('paramsts300t10-6.mat','bif','tolerance','h','len','numCars','mu','finalTime','tskip','delta','stepSize','delSigma','delv0','origv01','origv02');
+
     
     figure;
     scatter(bif(2,:),bif(1,:),'*');
