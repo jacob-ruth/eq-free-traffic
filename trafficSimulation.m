@@ -30,9 +30,9 @@ function trafficSimulation()
     
     options = odeset('AbsTol',10^-8,'RelTol',10^-8);
 %      tic;
-%      [t1,allTime_1] = ode45(@microsystem,[0 finalTime],[cars_1; v0_base1],options);
+%      [t1,allTime_1] = ode45(@microsystem,[0 finalTime],cars_1, options, v0_base1);
 %      ref_1 = allTime_1(end,:)';
-%      [t2,allTime_2] = ode45(@microsystem,[0 finalTime],[cars_2; v0_base2],options);
+%      [t2,allTime_2] = ode45(@microsystem,[0 finalTime],cars_2, options, v0_base2);
 %      ref_2 = allTime_2(end,:)';
 %      toc; 
 %     save('refStats.mat','ref_1','ref_2');
@@ -61,7 +61,7 @@ function trafficSimulation()
     
     allOfTheThings = zeros(2*numCars, 500);
     thingCounter = 1;
-    thingLabel = zeros(1,500)
+    thingLabel = zeros(1,500);
     
     sigma_1 = std(getHeadways(ref_1(1:numCars)));
     sigma_2 = std(getHeadways(ref_2(1:numCars)));
@@ -91,8 +91,7 @@ function trafficSimulation()
         u
         
 %         u = fsolve(@(u)FW(u,ref_2,w,newGuess), newGuess);
-        
->>>>>>> Stashed changes
+
         bif(:,iEq) = u;
 
         ref_1 = ref_2;
@@ -124,7 +123,7 @@ function trafficSimulation()
 %     while(abs(new_s - olds) > .01)
 %         l = lift(.15, 1, init, v0_base1);
 %         olds = std(init);
-%         [t,evolved] = ode45(@microsystem,[0 tskip+delta],[l;v0_base1],options);
+%         [t,evolved] = ode45(@microsystem,[0 tskip+delta],l,options,v0_base1);
 %         evolved = evolved(end,:)';
 %         init = getHeadways(evolved(1:numCars));
 %         new_s = std(init);
@@ -150,9 +149,9 @@ function trafficSimulation()
     %               future reference state
     function [sigma,new_state, sigma2, new_state2] = ler(sigma,ref,t,p,v0, tReference)
         lifted = lift(sigma, p, getHeadways(ref(1:numCars)),v0);
-         [~,evo] = ode45(@microsystem,[0 t],[lifted;v0],options);
+         [~,evo] = ode45(@microsystem,[0 t],lifted, options,v0);
          if (nargin > 5)
-             [~,evo2] = ode45(@microsystem,[0 tReference],[evo(end,1:2*numCars)';v0],options);
+             [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
              sigma2 = std(getHeadways(evo2(end,1:numCars)'));
          end
          evoCars = evo(end, 1:numCars)';
@@ -244,18 +243,13 @@ function trafficSimulation()
     %               and its velocity are given at num params(i), 
     %               params(i + numcars)
     %             
-    function u = microsystem(~,params)
+    function u = microsystem(~,colCars, v0)
         invT = 1.7;
-        colCars = params(1:(end - 1));
-        v0 = params(end);
-        colCars(1:numCars,1) = mod(colCars(1:numCars,1),len);
-        futureCars = circshift(colCars(1:numCars,1),-1,1);
-        headways = mod(futureCars - colCars(1:numCars,1),len);
+        headways = getHeadways(colCars(1:numCars));
         
         u = zeros(2*numCars,1);
         u(1:numCars,1) = colCars(numCars+1:2*numCars,1);
         u(numCars+1:2*numCars,1) = invT*(optimalVelocity(headways,v0) - colCars(numCars+1:2*numCars,1));
-        u(2*numCars+1,1) = 0;
     end
 
     %% Runge-Kutta
