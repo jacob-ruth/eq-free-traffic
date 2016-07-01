@@ -1,5 +1,4 @@
-
-function [F,J] = my_sys0(v,v0,par)
+function [F,J] = microFJ(sys1,sys2,N,L, v0, tau)
 
 % system:
 %
@@ -9,18 +8,17 @@ function [F,J] = my_sys0(v,v0,par)
 
 %% parameters and variables 
 
-N = par.N;          % discretization points
-M = par.M;          % number of cars (M must divide N)   
-L = par.L;          % length of road
-vel = par.vel;      % v0 velocity
-tau = par.tau;
-k = N/M;
+%N = par.N;          % discretization points
+%M = par.M;          % number of cars (M must divide N)   
+%L = par.L;           % length of road       % v0 velocity
+%tau = par.tau;
+k = 1;
+M = N;
+mu = sys1(end);
+c = sys1(end-1);     % wavespeed
 
-mu = v(end);
-c = v(end-1);     % wavespeed
-
-u = v(1:N);
-u0 = v0(1:N);
+u = sys1(1:N);
+u0 = sys2(1:N);
 
 % w = v(2*N+1:end-3);
 % w0 = v0(2*N+1:end-3);
