@@ -42,7 +42,7 @@ e2     = [e,-e];
 shift2 = [shift, -shift];
 
 %% Function
-  F = [ LN*u + optimalVelocity(shift*u, vel) - optimalVelocity(u, vel) ; ...
+  F = [ LN*u + optimalVelocity(shift*u, v0) - optimalVelocity(u, v0) ; ...
 %     - [zeros(N,1); sparse(N,1)] ...
 %     + [tanh(e2*u); sparse(N,1)] ...
 %     - [tanh(shift2*u); sparse(N,1)] + mu*[ones(N,1); sparse(N,1)]; ...
@@ -52,8 +52,8 @@ shift2 = [shift, -shift];
 
 %% Jacobian computation
 if nargout > 1
-    J0 = diag(optimalVHway(shift*u,vel));
-    J1 = diag(optimalVHway(u,vel));
+    J0 = diag(optimalVHway(shift*u,v0));
+    J1 = diag(optimalVHway(u,v0));
     Jc = (-2*c*tau*D2+D)*u;
     Jmu = ones(N,1);
     

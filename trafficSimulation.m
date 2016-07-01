@@ -3,20 +3,21 @@ function trafficSimulation()
     len = 60;
     numCars = 60;
     mu = .1;
-    finalTime = 200000;
+    finishedEvolution = 200000;
     tskip = 300;
     delta = 2000;
     stepSize = .001;
     delSigma = 0.00001;
     delv0 = 0.00001;
-    tolerance = 10^(-7);
+    tolerance = 10^(-12);
     %% initialize car positions and velocities
     cars_1 = zeros(2*numCars, 1);
     cars_2 = zeros(2*numCars, 1);
 
     origv01 = 0.91;
     origv02 = 0.9;
-    
+        options = odeset('AbsTol',10^-8,'RelTol',10^-8);
+   % c = approximateWaveSpeed(origv02);
     v0_base1 = origv01;
     v0_base2 = origv02;
     
@@ -28,7 +29,6 @@ function trafficSimulation()
         cars_2(i+numCars) = optimalVelocity(len/numCars, v0_base2);
     end
     
-    options = odeset('AbsTol',10^-8,'RelTol',10^-8);
 %      tic;
 %      [t1,allTime_1] = ode45(@microsystem,[0 finalTime],cars_1, options, v0_base1);
 %      ref_1 = allTime_1(end,:)';
@@ -37,6 +37,10 @@ function trafficSimulation()
 %      toc; 
 %     save('refStats.mat','ref_1','ref_2');
       load('refStats919.mat','ref_1','ref_2');
+      hways1 = getHeadways(ref_1(1:numCars));
+      hways2 = getHeadways(ref_2(1:numCars));
+      [f,~] = microFJ([hways1; -0.8581 ; 0], [hways2 ; -0.8581; 0], numCars, len, v0_base2, 1/1.7)
+      
      % std(getHeadways(ref_1(1:numCars)))
      % std(getHeadways(ref_2(1:numCars)))
     %load('things.mat', 'allOfTheThings');
@@ -59,9 +63,9 @@ function trafficSimulation()
     steps = 250;
     bif = zeros(2,steps);
     
-    allOfTheThings = zeros(2*numCars, 500);
-    thingCounter = 1;
-    thingLabel = zeros(1,500);
+    %allOfTheThings = zeros(2*numCars, 500);
+    %thingCounter = 1;
+    %thingLabel = zeros(1,500);
     
     sigma_1 = std(getHeadways(ref_1(1:numCars)));
     sigma_2 = std(getHeadways(ref_2(1:numCars)));
@@ -102,7 +106,7 @@ function trafficSimulation()
     end
     
 
-    save('normDeltathings.mat','allOfTheThings','thingLabel');
+    %save('normDeltathings.mat','allOfTheThings','thingLabel');
 
     save('paramsts300t10-6.mat','bif','tolerance','h','len','numCars','mu','finalTime','tskip','delta','stepSize','delSigma','delv0','origv01','origv02');
 
@@ -116,6 +120,33 @@ function trafficSimulation()
         fw(2) = W(1)*(u(1)-newGuess(1)) + W(2)*(u(2) - newGuess(2));
     end
     
+
+    function c = approximateWaveSpeed(v0)
+            waveCars = zeros(2*numCars, 1);
+            for waveI = 1:numCars
+                waveCars(waveI) = (waveI - 1) * len/numCars + mu*sin(2*pi*waveI/numCars);
+                waveCars(waveI+numCars) = optimalVelocity(len/numCars, v0);
+            end
+            [t,carsEvolved] = ode45(@microsystem,[0 50000],waveCars, options, v0);
+            waveCarsEvolved  = carsEvolved(:,1:numCars)';
+                        save('waveEvolved91.mat', 't', 'carsEvolved')
+
+            waveCarsHeadways = getHeadways(waveCarsEvolved);
+            [headWay, nextCar] = max(getHeadways(waveCarsEvolved(1:numCars)));
+            function [diff, isTerminal, direction] = trigger(~,y,~)
+                isTerminal = 1;
+                direction = 0;
+                diff = prevCarMaxHeadway(y,headWay, mod((nextCar - 1),60));
+            end
+            stoppingOptions = odeset('AbsTol',10^-8,'RelTol',10^-8, 'Events', @trigger);
+            [~, carsEnd,te,ye,ie] = ode45(@microsystem,[0,10000],waveCarsEvolved, stoppingOptions, v0);
+            c = -1/te;
+    end
+    function outDiff = prevCarMaxHeadway(y, headway, carIndex)
+        headways = getHeadways(y(1:numCars));
+        outDiff = headways(carIndex) - headway;
+    end
+
     %% lift and evolve to relatively steady state
 %     init = getHeadways(ref_1(1:numCars)); %init is headways
 %     new_s = 100000;
@@ -255,7 +286,7 @@ function trafficSimulation()
     %% Runge-Kutta
     function xr = rungeKutta(f, u)
         ts = .1;
-        N = finalTime/ts;
+        N = finishedEvolution/ts;
         xr = zeros(2*numCars,N+1);
         xr(:,1) = u;
         x = u;
