@@ -1,4 +1,4 @@
-load('waveEvolved.mat');
+load('waveEvolved91.mat');
 carPositions = carsEvolved(:,1:60)';
 futureCars = circshift(carPositions,[-1,0]);
 
@@ -18,5 +18,3 @@ figure;
 plot(t, std(carHeadways));
 avDt = mean(dT(30000:end));
 c = -1/avDt
-J=find(diff([maxHwayIndex(1)-1; maxHwayIndex]));
-B=[maxHwayIndex(J), diff([J; numel(maxHwayIndex)+1])];
