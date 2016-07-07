@@ -1,9 +1,18 @@
 function [vec,val] = diffusionMap(epsilon,distMatrix,k)
+    %find Markov matrix and its eigenvalues/eigenvectors
     A = basicKernel(distMatrix);
     M = markovify(A);
     [eigenvec,eigenval] = eig(M);
-    D2 = diag(sort(diag(D),'descend'));
-    [c,ind] = sort(diag(
+    
+    %sort eigenvalues and eigenvectors
+    seval = diag(sort(diag(eigenval),'descend'));
+    [c,ind] = sort(diag(eigenval),'descend');
+    sevec = eigenvec(:,ind);
+    seval = sparse(seval);
+    
+    %return first k eg
+    val = seval(1:k,1:k);
+    vec = sevec(:,1:k);
     
     function M = markovify(af)
         M = zeros(size(af));
