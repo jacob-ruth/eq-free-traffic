@@ -1,4 +1,4 @@
-function trafficSimulation()
+function trafficSimulation2()
     h = 1.2;
     len = 60;
     numCars = 60;
@@ -6,7 +6,7 @@ function trafficSimulation()
     finishedEvolution = 200000;
     tskip = 300;
     delta = 2000;
-    stepSize = .001;
+    stepSize = 1;
     delSigma = 0.00001;
     delv0 = 0.00001;
     tolerance = 10^(-12);
@@ -39,13 +39,69 @@ function trafficSimulation()
       load('refStats919.mat','ref_1','ref_2');
       hways1 = getHeadways(ref_1(1:numCars));
       hways2 = getHeadways(ref_2(1:numCars));
-      [f,~] = microFJ([hways1; -0.8581 ; 0], [hways2 ; -0.8581; 0], numCars, len, v0_base2, 1/1.7)
+      %% Testing on same initial conditions
+%       [t2b,allTime_2b] = ode45(@microsystem,[0 1],ref_2(1:2*numCars), options, v0_base2);
+%       ref_2b = allTime_2b(end,:)';
+%       hways2 = getHeadways(ref_2b(1:numCars));
+%       badGuess = zeros(numCars,1);
+%       for iPerturb = 1:numCars
+%           badGuess(iPerturb) = hways2(iPerturb) + .3*sin(iPerturb*2*pi/numCars);
+%       end
+%       f = microFJ([hways1; -0.8581], [hways2 ; -0.8581], numCars, len, v0_base2, 1/1.7);
+%       normF = norm(f);
+%       sys1 = [hways1; -0.8581];
+%       u = fsolve(@(sys1)microFJ(sys1, [hways2 ; -0.8581], numCars, len,v0_base2, 1/1.7), [hways2;-0.8581]);
+%       
       
+      %% Bifurcation on micro 
+      steps = 100;
+      stepSize = 0.01;
+      
+      foptions = optimset( 'TolFun',1e-12,'TolX',1e-12);
+      
+      hways1 = getHeadways(ref_1(1:numCars));
+      hways2 = getHeadways(ref_2(1:numCars));
+      [~, max1] = max(hways1);
+      [~, max2] = max(hways2);
+      hways1 = circshift(hways1, [-max1, 0]);
+      hways2 =circshift (hways2, [-max2, 0]);
+      sys1 = [hways1; -0.8581; 0; v0_base1];
+      sys2 = [hways2; -0.8581; 0; v0_base2];
+      bif  = zeros(numCars + 3, steps);
+      
+      for iMic = 1:steps
+          w = sys2 - sys1;
+          newGuess = sys2 + stepSize*(w/norm(w));
+          u = fsolve(@(sys2)FW(sys2, sys1, numCars, len, 1/1.7, w, newGuess), newGuess, foptions);
+          bif(:,iMic) = u;
+          
+          sys1 = sys2;
+          
+          sys2 = u;
+        
+%           
+%           hways1 = sys1(1:numCars);
+%           hways2 = sys2(1:numCars);
+%           
+%           [~, max1] = max(hways1);
+%           [~, max2] = max(hways2);
+%           sys1(1:numCars) = circshift(hways1, [-max1, 0]);
+%           sys2(1:numCars) = circshift(hways2, [-max2, 0]);
+           
+      end
+      figure;
+      scatter(bif(end,:), std(bif(1:numCars,:)), '.')
+      [~,max2] = max(bif(1:numCars,:),[],1);
+      figure;
+      scatter(1:steps,max2);
+      figure;
+      scatter(1:steps, bif(end,:));
      % std(getHeadways(ref_1(1:numCars)))
      % std(getHeadways(ref_2(1:numCars)))
     %load('things.mat', 'allOfTheThings');
     %std(getHeadways(allOfTheThings(1:numCars, 100)))
-    %% plot the results
+%{    
+%% plot the results
 %     hEnd = getHeadways(allTime_2(end,1:numCars)');
 %     hStart = getHeadways(allTime_2(1,1:numCars)');
 %     figure;
@@ -58,66 +114,13 @@ function trafficSimulation()
 %     
 %     figure;
 %     plot(t, s);
+    %}
     
-    %% initialize secant continuation
-    steps = 250;
-    bif = zeros(2,steps);
-    
-    %allOfTheThings = zeros(2*numCars, 500);
-    %thingCounter = 1;
-    %thingLabel = zeros(1,500);
-    
-    sigma_1 = std(getHeadways(ref_1(1:numCars)));
-    sigma_2 = std(getHeadways(ref_2(1:numCars)));
-    
-    for iEq=1:steps
-        iEq
-        w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];
-        newGuess = [sigma_2; v0_base2] + stepSize *(w/norm(w));
-
-        %% Newton and that other guy's method
-        u = newGuess;
-        firstGuess = u;
-        f = F(ref_2, u(1),u(2));
-        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
-        k=1;
-        
-        while((abs(f)>tolerance || abs(neww)>tolerance) && k < 20)
-%             fprintf('starting iteration %f \n', k)
-            f = F(ref_2, u(1),u(2));
-%             fprintf('f is %d \n', f);
-            Df = jacobian(ref_2, u(1), u(2), w);
-            neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
-
-            u = u - Df^(-1)*[f;neww];
-            k = k + 1;
-        end        
-        u
-        
-%         u = fsolve(@(u)FW(u,ref_2,w,newGuess), newGuess);
-
-        bif(:,iEq) = u;
-
-        ref_1 = ref_2;
-        sigma_1 = sigma_2;
-        v0_base1 = v0_base2;
-        v0_base2 = u(2);
-        [sigma_2,ref_2] = ler(u(1),ref_1,tskip+delta,1,u(2));
-    end
-    
-
-    %save('normDeltathings.mat','allOfTheThings','thingLabel');
-
-    save('paramsts300t10-6.mat','bif','tolerance','h','len','numCars','mu','finalTime','tskip','delta','stepSize','delSigma','delv0','origv01','origv02');
-
-    
-    figure;
-    scatter(bif(2,:),bif(1,:),'*');
-    
-    function fw = FW(u,ref,W,newGuess)
-        fw = zeros(2,1);
-        fw(1) = F(ref,u(1),u(2));
-        fw(2) = W(1)*(u(1)-newGuess(1)) + W(2)*(u(2) - newGuess(2));
+    function fw = FW(sys2, sys1, N, L, tau, W, NewGuess)
+        v0 = sys2(end);
+        fw = zeros(N+3,1);
+        fw(1:N+2) = microFJ2(sys2(1:end-1), sys1, N, L, v0, tau);
+        fw(end) = W' * (sys2-NewGuess);
     end
     
 

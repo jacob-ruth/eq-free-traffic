@@ -1,26 +1,26 @@
-function trafficSimulation()
-    h = 1.2;
-    len = 60;
-    numCars = 60;
-    mu = .1;
-    finishedEvolution = 200000;
-    tskip = 300;
-    delta = 2000;
-    stepSize = .001;
-    delSigma = 0.00001;
-    delv0 = 0.00001;
-    tolerance = 10^(-12);
-    %% initialize car positions and velocities
+function trafficBifurcation()
+    h = 1.2;                % optimal velocity parameter
+    len = 60;               % length of the ring road
+    numCars = 60;           % number of cars
+    mu = .1;                % initial position parameter
+    finalTime = 200000;     % reference state final time
+    
+    tskip = 300;            % times for evolving
+    delta = 2000;           
+    
+    stepSize = .001;        % step size for the secant line approximation
+    delSigma = 0.00001;     % delta sigma used for finite difference of F
+    delv0 = 0.00001;        % delta v0 used for finite difference of F
+    tolerance = 10^(-7);    % tolerance for Newton's method
+    
+    v0_base1 = 0.91;        % initial velocities for secant line approximation
+    v0_base2 = 0.9;
+    
+	options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
+    
+    %% initialize car posoitions and velocities
     cars_1 = zeros(2*numCars, 1);
     cars_2 = zeros(2*numCars, 1);
-
-    origv01 = 0.91;
-    origv02 = 0.9;
-        options = odeset('AbsTol',10^-8,'RelTol',10^-8);
-   % c = approximateWaveSpeed(origv02);
-    v0_base1 = origv01;
-    v0_base2 = origv02;
-    
     for i = 1:numCars
         cars_1(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
         cars_1(i+numCars) = optimalVelocity(len/numCars, v0_base1);
@@ -28,145 +28,87 @@ function trafficSimulation()
         cars_2(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
         cars_2(i+numCars) = optimalVelocity(len/numCars, v0_base2);
     end
+
+    %% initialize the reference states if not already saved
+    %{
+	[t1,allTime_1] = ode45(@microsystem,[0 finalTime],cars_1, options, v0_base1);
+	ref_1 = allTime_1(end,:)';
+	[t2,allTime_2] = ode45(@microsystem,[0 finalTime],cars_2, options, v0_base2);
+	ref_2 = allTime_2(end,:)';
+	save('refStats.mat','ref_1','ref_2'); % save reference states 
+    %}
     
-%      tic;
-%      [t1,allTime_1] = ode45(@microsystem,[0 finalTime],cars_1, options, v0_base1);
-%      ref_1 = allTime_1(end,:)';
-%      [t2,allTime_2] = ode45(@microsystem,[0 finalTime],cars_2, options, v0_base2);
-%      ref_2 = allTime_2(end,:)';
-%      toc; 
-%     save('refStats.mat','ref_1','ref_2');
-      load('refStats919.mat','ref_1','ref_2');
-      hways1 = getHeadways(ref_1(1:numCars));
-      hways2 = getHeadways(ref_2(1:numCars));
-      [f,~] = microFJ([hways1; -0.8581 ; 0], [hways2 ; -0.8581; 0], numCars, len, v0_base2, 1/1.7)
-      
-     % std(getHeadways(ref_1(1:numCars)))
-     % std(getHeadways(ref_2(1:numCars)))
-    %load('things.mat', 'allOfTheThings');
-    %std(getHeadways(allOfTheThings(1:numCars, 100)))
-    %% plot the results
-%     hEnd = getHeadways(allTime_2(end,1:numCars)');
-%     hStart = getHeadways(allTime_2(1,1:numCars)');
-%     figure;
-%     hold on;
-%     plot(1:1:numCars,hEnd);
-%     plot(1:1:numCars,hStart, '--or');
-%     hold off;
-%     
-%     s = std(getHeadways(allTime_2(:,1:numCars)'));
-%     
-%     figure;
-%     plot(t, s);
+    % load the reference states if they have already been calculated
+    load('refStats919.mat','ref_1','ref_2');  
     
     %% initialize secant continuation
-    steps = 250;
-    bif = zeros(2,steps);
+    steps = 200;                                % number of steps to take around the curve
+    bif = zeros(2,steps);                       % array to hold the bifurcation values
     
-    %allOfTheThings = zeros(2*numCars, 500);
-    %thingCounter = 1;
-    %thingLabel = zeros(1,500);
-    
-    sigma_1 = std(getHeadways(ref_1(1:numCars)));
+    sigma_1 = std(getHeadways(ref_1(1:numCars)));      %initial sigma values for secant line approximation
     sigma_2 = std(getHeadways(ref_2(1:numCars)));
     
+    %% pseudo arc length continuation
     for iEq=1:steps
-        iEq
-        w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];
-        newGuess = [sigma_2; v0_base2] + stepSize *(w/norm(w));
+        fprintf('Starting iteration %d of %d \n', iEq, steps);
+        w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];          % slope of the secant line
+        newGuess = [sigma_2; v0_base2] + stepSize *(w/norm(w)); % first guess on the secant line
 
+        %% initialize Newton's method
+        u = newGuess;                                               
+        f = F(ref_2, u(1),u(2));                                    % calculate the function to zero
+        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2)); 
+        
+        Df = jacobian(ref_2, u(1), u(2), w);                        % calculate the jacobian
+        invD = Df^(-1);                                             % invert the jacobian
+        k=1;                                                        % Newton's method counter
+        
         %% Newton and that other guy's method
-        u = newGuess;
-        firstGuess = u;
-        f = F(ref_2, u(1),u(2));
-        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
-        k=1;
-        
-        while((abs(f)>tolerance || abs(neww)>tolerance) && k < 20)
-%             fprintf('starting iteration %f \n', k)
-            f = F(ref_2, u(1),u(2));
-%             fprintf('f is %d \n', f);
-            Df = jacobian(ref_2, u(1), u(2), w);
+        while(norm(invD*[f;neww])>tolerance && k < 20)
+            fprintf('\t Newton iteration: %d \n', k);
+            f = F(ref_2, u(1),u(2));                                % calculcate the function to zero
             neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
-
-            u = u - Df^(-1)*[f;neww];
+            Df = jacobian(ref_2, u(1), u(2), w);                    % find the jacobian
+            invD = Df^(-1);
+            u = u - invD*[f;neww];                                  % perform the Newton step
             k = k + 1;
-        end        
-        u
+        end  
         
-%         u = fsolve(@(u)FW(u,ref_2,w,newGuess), newGuess);
+        %% alternate Newton's method using fsolve
+        % u = fsolve(@(u)FW(u,ref_2,w,newGuess), newGuess); 
 
-        bif(:,iEq) = u;
+        bif(:,iEq) = u;                                             % save the new solution
 
+        %% reset the values for the arc length continuation
         ref_1 = ref_2;
         sigma_1 = sigma_2;
         v0_base1 = v0_base2;
         v0_base2 = u(2);
-        [sigma_2,ref_2] = ler(u(1),ref_1,tskip+delta,1,u(2));
+        [sigma_2,ref_2] = ler(u(1),ref_1,tskip+delta,1,u(2));       % find the new reference state
     end
-    
 
-    %save('normDeltathings.mat','allOfTheThings','thingLabel');
-
-    save('paramsts300t10-6.mat','bif','tolerance','h','len','numCars','mu','finalTime','tskip','delta','stepSize','delSigma','delv0','origv01','origv02');
-
-    
+    %% plot the bifurcation diagram
     figure;
     scatter(bif(2,:),bif(1,:),'*');
     
+    %% functions
+    
+    %% function to zero for fsolve
+    % u         - the current value of (sigma, v0) that we're trying to find
+    %               with Newton's method
+    % ref       - the most recent reference state
+    % W         - the slope of the secant line for arc length continuation
+    % newGuess  - the first guess on the secant line for arc length
+    %               continuation
+    %
+    % RETURNS:
+    % fw    - the functions F and w evaluated at these parameters
     function fw = FW(u,ref,W,newGuess)
         fw = zeros(2,1);
         fw(1) = F(ref,u(1),u(2));
         fw(2) = W(1)*(u(1)-newGuess(1)) + W(2)*(u(2) - newGuess(2));
     end
-    
 
-    function c = approximateWaveSpeed(v0)
-            waveCars = zeros(2*numCars, 1);
-            for waveI = 1:numCars
-                waveCars(waveI) = (waveI - 1) * len/numCars + mu*sin(2*pi*waveI/numCars);
-                waveCars(waveI+numCars) = optimalVelocity(len/numCars, v0);
-            end
-            [t,carsEvolved] = ode45(@microsystem,[0 50000],waveCars, options, v0);
-            waveCarsEvolved  = carsEvolved(:,1:numCars)';
-                        save('waveEvolved91.mat', 't', 'carsEvolved')
-
-            waveCarsHeadways = getHeadways(waveCarsEvolved);
-            [headWay, nextCar] = max(getHeadways(waveCarsEvolved(1:numCars)));
-            function [diff, isTerminal, direction] = trigger(~,y,~)
-                isTerminal = 1;
-                direction = 0;
-                diff = prevCarMaxHeadway(y,headWay, mod((nextCar - 1),60));
-            end
-            stoppingOptions = odeset('AbsTol',10^-8,'RelTol',10^-8, 'Events', @trigger);
-            [~, carsEnd,te,ye,ie] = ode45(@microsystem,[0,10000],waveCarsEvolved, stoppingOptions, v0);
-            c = -1/te;
-    end
-    function outDiff = prevCarMaxHeadway(y, headway, carIndex)
-        headways = getHeadways(y(1:numCars));
-        outDiff = headways(carIndex) - headway;
-    end
-
-    %% lift and evolve to relatively steady state
-%     init = getHeadways(ref_1(1:numCars)); %init is headways
-%     new_s = 100000;
-%     olds = 0;
-%     while(abs(new_s - olds) > .01)
-%         l = lift(.15, 1, init, v0_base1);
-%         olds = std(init);
-%         [t,evolved] = ode45(@microsystem,[0 tskip+delta],l,options,v0_base1);
-%         evolved = evolved(end,:)';
-%         init = getHeadways(evolved(1:numCars));
-%         new_s = std(init);
-%     end
-%     
-%     figure;
-%     hold on
-%     plot(1:1:numCars,getHeadways(ref_1(1:numCars)),'or')
-%     plot(1:1:numCars,init,'xb')
-%     plot(1:1:numCars,getHeadways(l(1:numCars)),'*g')
-%     hold off
-    
     %% lift, evolve, restrict
     % sigma - the current value of the std, used to seed the lifting
     % ref   - a reference state, used to seed the lifting
@@ -194,6 +136,7 @@ function trafficSimulation()
              new_state2 = evo2(end,1:2*numCars)';
          end
     end
+
     %% Finite Difference Quotient
     %  ref - reference state to base the lifting 
     %  sigma - the current value of the std. at which point to approximate
@@ -205,6 +148,7 @@ function trafficSimulation()
         [r0, ~, r1] = ler(sigma, ref, tskip, 1, v0, delta);
         dif = (r1-r0)/delta;
     end
+
     %% Jacobian for newton's method
     % ref - The previous reference state used to compute F.
     % sigma - the current value of sigma 
@@ -236,12 +180,12 @@ function trafficSimulation()
     function new = lift(s, p, hways, v0)
         del = p * s/std(hways) * (hways - mean(hways)) + mean(hways);
         new = zeros(length(hways)*2,1);
-        for i=2:length(hways)
-            new(i) = mod(sum(del(1:i-1)),len);
+        for iLift=2:length(hways)
+            new(iLift) = mod(sum(del(1:iLift-1)),len);
         end
         hways = getHeadways(new(1:length(hways)));
-        for i=1:length(hways)
-            new(i+length(hways)) = optimalVelocity(hways(i), v0);
+        for iLift=1:length(hways)
+            new(iLift+length(hways)) = optimalVelocity(hways(iLift), v0);
         end
     end
     
@@ -283,21 +227,4 @@ function trafficSimulation()
         u(numCars+1:2*numCars,1) = invT*(optimalVelocity(headways,v0) - colCars(numCars+1:2*numCars,1));
     end
 
-    %% Runge-Kutta
-    function xr = rungeKutta(f, u)
-        ts = .1;
-        N = finishedEvolution/ts;
-        xr = zeros(2*numCars,N+1);
-        xr(:,1) = u;
-        x = u;
-
-        for j=1:N
-            k1 = f(0,x);
-            k2 = f(0,x+ts/2*k1);
-            k3 = f(0,x+ts/2*k2);
-            k4 = f(0,x+ts*k3);
-            x = x+ts/6*(k1+2*k2+2*k3+k4);
-            xr(:,j+1) = x;
-        end
-    end
 end

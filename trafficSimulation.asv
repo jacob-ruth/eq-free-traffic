@@ -3,7 +3,7 @@ function trafficSimulation()
     len = 60;
     numCars = 60;
     mu = .1;
-    finishedEvolution = 200000;
+    finalTime = 200000;
     tskip = 300;
     delta = 2000;
     stepSize = .001;
@@ -14,12 +14,8 @@ function trafficSimulation()
     cars_1 = zeros(2*numCars, 1);
     cars_2 = zeros(2*numCars, 1);
 
-    origv01 = 0.91;
-    origv02 = 0.9;
-        options = odeset('AbsTol',10^-8,'RelTol',10^-8);
-   % c = approximateWaveSpeed(origv02);
-    v0_base1 = origv01;
-    v0_base2 = origv02;
+    v0_base1 = 0.91;
+    v0_base2 = 0.9;
     
     for i = 1:numCars
         cars_1(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
@@ -29,18 +25,15 @@ function trafficSimulation()
         cars_2(i+numCars) = optimalVelocity(len/numCars, v0_base2);
     end
     
+    options = odeset('AbsTol',10^-8,'RelTol',10^-8);
 %      tic;
-%      [t1,allTime_1] = ode45(@microsystem,[0 finalTime],cars_1, options, v0_base1);
+%      [t1,allTime_1] = ode45(@microsystem,[0 finalTime],[cars_1; v0_base1],options);
 %      ref_1 = allTime_1(end,:)';
-%      [t2,allTime_2] = ode45(@microsystem,[0 finalTime],cars_2, options, v0_base2);
+%      [t2,allTime_2] = ode45(@microsystem,[0 finalTime],[cars_2; v0_base2],options);
 %      ref_2 = allTime_2(end,:)';
 %      toc; 
 %     save('refStats.mat','ref_1','ref_2');
       load('refStats919.mat','ref_1','ref_2');
-      hways1 = getHeadways(ref_1(1:numCars));
-      hways2 = getHeadways(ref_2(1:numCars));
-      [f,~] = microFJ([hways1; -0.8581 ; 0], [hways2 ; -0.8581; 0], numCars, len, v0_base2, 1/1.7)
-      
      % std(getHeadways(ref_1(1:numCars)))
      % std(getHeadways(ref_2(1:numCars)))
     %load('things.mat', 'allOfTheThings');
@@ -63,39 +56,33 @@ function trafficSimulation()
     steps = 250;
     bif = zeros(2,steps);
     
-    %allOfTheThings = zeros(2*numCars, 500);
-    %thingCounter = 1;
-    %thingLabel = zeros(1,500);
-    
-    sigma_1 = std(getHeadways(ref_1(1:numCars)));
-    sigma_2 = std(getHeadways(ref_2(1:numCars)));
-    
+    allOfTheThings = zeros(2*numCars, 500);
+    thingCounter = 1;
+    thingLabel = zeros(1,500);
     for iEq=1:steps
         iEq
+        sigma_1 = std(getHeadways(ref_1(1:numCars)));
+        sigma_2 = std(getHeadways(ref_2(1:numCars)));
         w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];
         newGuess = [sigma_2; v0_base2] + stepSize *(w/norm(w));
 
         %% Newton and that other guy's method
         u = newGuess;
-        firstGuess = u;
         f = F(ref_2, u(1),u(2));
         neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
         k=1;
-        
         while((abs(f)>tolerance || abs(neww)>tolerance) && k < 20)
-%             fprintf('starting iteration %f \n', k)
+            thingLabel(thingCounter) = k;
+            [~,allOfTheThings(:,thingCounter)] = ler(u(1),ref_2,tskip+delta,1,u(2));
+            thingCounter = 1 + thingCounter;
+            fprintf('starting iteration %f \n', k);
             f = F(ref_2, u(1),u(2));
-%             fprintf('f is %d \n', f);
+            fprintf('f is %f \n', f)
             Df = jacobian(ref_2, u(1), u(2), w);
             neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
-
             u = u - Df^(-1)*[f;neww];
             k = k + 1;
         end        
-        u
-        
-%         u = fsolve(@(u)FW(u,ref_2,w,newGuess), newGuess);
-
         bif(:,iEq) = u;
 
         ref_1 = ref_2;
@@ -103,13 +90,11 @@ function trafficSimulation()
         v0_base1 = v0_base2;
         v0_base2 = u(2);
         [sigma_2,ref_2] = ler(u(1),ref_1,tskip+delta,1,u(2));
+        allOfTheThings(:,thingCounter) = ref_2;
+        thingCounter = 1 + thingCounter;
     end
     
-
-    %save('normDeltathings.mat','allOfTheThings','thingLabel');
-
-    save('paramsts300t10-6.mat','bif','tolerance','h','len','numCars','mu','finalTime','tskip','delta','stepSize','delSigma','delv0','origv01','origv02');
-
+    save('normDeltathings.mat','allOfTheThings','thingLabel');
     
     figure;
     scatter(bif(2,:),bif(1,:),'*');
@@ -120,33 +105,6 @@ function trafficSimulation()
         fw(2) = W(1)*(u(1)-newGuess(1)) + W(2)*(u(2) - newGuess(2));
     end
     
-
-    function c = approximateWaveSpeed(v0)
-            waveCars = zeros(2*numCars, 1);
-            for waveI = 1:numCars
-                waveCars(waveI) = (waveI - 1) * len/numCars + mu*sin(2*pi*waveI/numCars);
-                waveCars(waveI+numCars) = optimalVelocity(len/numCars, v0);
-            end
-            [t,carsEvolved] = ode45(@microsystem,[0 50000],waveCars, options, v0);
-            waveCarsEvolved  = carsEvolved(:,1:numCars)';
-                        save('waveEvolved91.mat', 't', 'carsEvolved')
-
-            waveCarsHeadways = getHeadways(waveCarsEvolved);
-            [headWay, nextCar] = max(getHeadways(waveCarsEvolved(1:numCars)));
-            function [diff, isTerminal, direction] = trigger(~,y,~)
-                isTerminal = 1;
-                direction = 0;
-                diff = prevCarMaxHeadway(y,headWay, mod((nextCar - 1),60));
-            end
-            stoppingOptions = odeset('AbsTol',10^-8,'RelTol',10^-8, 'Events', @trigger);
-            [~, carsEnd,te,ye,ie] = ode45(@microsystem,[0,10000],waveCarsEvolved, stoppingOptions, v0);
-            c = -1/te;
-    end
-    function outDiff = prevCarMaxHeadway(y, headway, carIndex)
-        headways = getHeadways(y(1:numCars));
-        outDiff = headways(carIndex) - headway;
-    end
-
     %% lift and evolve to relatively steady state
 %     init = getHeadways(ref_1(1:numCars)); %init is headways
 %     new_s = 100000;
@@ -154,7 +112,7 @@ function trafficSimulation()
 %     while(abs(new_s - olds) > .01)
 %         l = lift(.15, 1, init, v0_base1);
 %         olds = std(init);
-%         [t,evolved] = ode45(@microsystem,[0 tskip+delta],l,options,v0_base1);
+%         [t,evolved] = ode45(@microsystem,[0 tskip+delta],[l;v0_base1],options);
 %         evolved = evolved(end,:)';
 %         init = getHeadways(evolved(1:numCars));
 %         new_s = std(init);
@@ -180,18 +138,15 @@ function trafficSimulation()
     %               future reference state
     function [sigma,new_state, sigma2, new_state2] = ler(sigma,ref,t,p,v0, tReference)
         lifted = lift(sigma, p, getHeadways(ref(1:numCars)),v0);
-         [~,evo] = ode45(@microsystem,[0 t],lifted, options,v0);
+         [~,evo] = ode45(@microsystem,[0 t],[lifted;v0],options);
          if (nargin > 5)
-             [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
+             [~,evo2] = ode45(@microsystem,[0 tReference],[evo(end,:)';v0],options);
              sigma2 = std(getHeadways(evo2(end,1:numCars)'));
          end
          evoCars = evo(end, 1:numCars)';
          sigma = std(getHeadways(evoCars));
-         if(nargout >= 2)
+         if(nargout >1)
              new_state = evo(end,1:2*numCars)';
-         end
-         if(nargout == 4)
-             new_state2 = evo2(end,1:2*numCars)';
          end
     end
     %% Finite Difference Quotient
@@ -202,7 +157,8 @@ function trafficSimulation()
     %  RETURNS:
     %  dif - the difference which approximates the time derivative
     function dif = F(ref, sigma,v0)
-        [r0, ~, r1] = ler(sigma, ref, tskip, 1, v0, delta);
+        r0 = ler(sigma, ref, tskip, 1,v0);
+        r1 = ler(sigma, ref1, delta, 1,v0);
         dif = (r1-r0)/delta;
     end
     %% Jacobian for newton's method
@@ -274,19 +230,24 @@ function trafficSimulation()
     %               and its velocity are given at num params(i), 
     %               params(i + numcars)
     %             
-    function u = microsystem(~,colCars, v0)
+    function u = microsystem(~,params)
         invT = 1.7;
-        headways = getHeadways(colCars(1:numCars));
+        colCars = params(1:(end - 1));
+        v0 = params(end);
+        colCars(1:numCars,1) = mod(colCars(1:numCars,1),len);
+        futureCars = circshift(colCars(1:numCars,1),-1,1);
+        headways = mod(futureCars - colCars(1:numCars,1),len);
         
         u = zeros(2*numCars,1);
         u(1:numCars,1) = colCars(numCars+1:2*numCars,1);
         u(numCars+1:2*numCars,1) = invT*(optimalVelocity(headways,v0) - colCars(numCars+1:2*numCars,1));
+        u(2*numCars+1,1) = 0;
     end
 
     %% Runge-Kutta
     function xr = rungeKutta(f, u)
         ts = .1;
-        N = finishedEvolution/ts;
+        N = finalTime/ts;
         xr = zeros(2*numCars,N+1);
         xr(:,1) = u;
         x = u;
