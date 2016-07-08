@@ -1,7 +1,9 @@
 function runDiffMap()
-load('trajectory90.mat','allTime');
+load('tracyOutput','output9');
+load('rebeccaOutput.mat','outputRebecca');
 
-allTime = allTime';
+allTime = output9;
+
 allTime = allTime(:,end-5000:10:end);
 
 eps = .06;
@@ -30,7 +32,16 @@ for r = 1:length(allTime)
     end
 end
 
-diffusionMap(eps,D);
+k=2;
+[vec,val] = diffusionMap(eps,D,k);
+map = zeros(k,size(vec,1));
+vec = vec';
+for r = 1:k
+    vec(r,:) = val(r,r)*vec(r,:);
+end
+scatter(vec(1,:),vec(2,:));
+
+
 
 
     function plotEps()
