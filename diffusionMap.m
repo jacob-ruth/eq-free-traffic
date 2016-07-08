@@ -11,8 +11,8 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     seval = sparse(seval);
     
     %return first k eigenvalues/vectors
-    val = seval(1:k,1:k);
-    vec = sevec(:,1:k);
+    val = seval(2:k+1,2:k+1);
+    vec = sevec(:,2:k+1);
     
     function M = markovify(af)
         M = zeros(size(af));
