@@ -14,7 +14,7 @@ function trafficSimulation2()
     cars_1 = zeros(2*numCars, 1);
     cars_2 = zeros(2*numCars, 1);
 
-    origv01 = 0.91;
+    origv01 = 0.9;
     origv02 = 0.9;
         options = odeset('AbsTol',10^-8,'RelTol',10^-8);
    % c = approximateWaveSpeed(origv02);
@@ -24,27 +24,28 @@ function trafficSimulation2()
     
     
     
-    v0Steps = 4;
+    v0Steps = 20;
     
-    output = zeros(2*numCars, v0Steps*500);
+    output9 = zeros(2*numCars, v0Steps*500);
     
     for p = 1: v0Steps
+        p
         
     for i = 1:numCars
         cars_1(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
         cars_1(i+numCars) = optimalVelocity(len/numCars, v0_base1);
     end
     
-     [~,allTime_1] = ode45(@microsystem,[0 3000],cars_1, options, v0_base1);
+     [~,allTime_1] = ode45(@microsystem,[0 50000],cars_1, options, v0_base1);
      
-     output(:, ((p - 1)*500 + 1):1:p*500) = allTime_1((end - 1497):3: end,: )';
-     v0_base1 = v0_base1 - 0.01;
+     output9(:, ((p - 1)*500 + 1):1:p*500) = allTime_1((end - 1497):3: end,: )';
+     v0_base1 = v0_base1 - 0.0005;
     end;
     
     
     
     
-      save('jakeOutput.mat','output');
+      save('tracyOutput.mat','output9');
       hways1 = getHeadways(ref_1(1:numCars));
       hways2 = getHeadways(ref_2(1:numCars));
       
