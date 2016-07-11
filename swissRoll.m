@@ -1,90 +1,57 @@
-function runDiffMap()
-theta = linspace(0,4*pi, 100)';
-f  = [theta.*cos(theta) theta.*sin(theta)];
+function swissRoll()
+
+%% swill roll from Dsilva paper
+% number of data points
+N = 1500; 
+
+% construct archemedian spiral
+a = 1;
+theta_vec = linspace(0, 4*pi, 100);
+s = 0.5*a*(theta_vec.*sqrt(1+theta_vec.^2)+log(theta_vec+sqrt(1+theta_vec.^2)));
+% height
+h = 40;
+%% generate data
+% intialize random number generator
+rng(321);
+% find angles which correspond to uniform sampling along spiral
+theta = interp1(s, theta_vec, rand(N, 1)*max(s));
+% data uniformly distributed on swiss roll
+z = h*rand(N,1); 
+x = a * cos(theta) .* theta;
+y = a * sin(theta) .* theta;
+% store all data
+data = [x y z]; 
+
+%{
+% plot the data
 figure;
-plot(f(:,1), f(:,2),'.');
-eps = 0.5;
+scatter3(data(:,1), data(:,2), data(:,3));
+title('Swiss roll data points');
+%}
 
-
-D = zeros(length(theta));
-for r = 1:length(theta)
-    for c = 1:length(theta)
-        D(r,c) = norm(f(r,:)-f(c,:));
+% calculate the distance matrix
+D = zeros(N);
+for r = 1:N
+    for c = 1:N
+        D(r,c) = norm(data(r,:)-data(c,:));
     end
 end
 
-D;
+% find the value of epsilon
+eps = sqrt(median(pdist(data))/3);
 
-stepSize = .0001;
-maxEps = 50;
+% find the diffusion map
+k = 5;
+[vec, val] = diffusionMap(eps, D,k);
 
-[vec, val] = diffusionMap(eps, D,5);
-t = 5;
-
+% plot the data colored by the eigen direction
+figure;
+scatter3(data(:,1), data(:,2), data(:,3), 20, vec(:,1),'.');
+title('Data colored by first eigen-direction with h = 40');
 
 figure;
-plot3(f(:,1), f(:,2),(val(1,1)^t)*vec(:,1));
-
-figure;
-plot3(f(:,1), f(:,2),(val(2,2)^t)*vec(:,2));
-
-figure;
-plot3(f(:,1), f(:,2),(val(3,3)^t)*vec(:,3));
-
-figure;
-plot3(f(:,1), f(:,2),(val(4,4)^t)*vec(:,4));
-
-return;
-t = 1;
-figure;
-plot((val(1,1)^t)*vec(:,1));
-title('Time = 1');
-figure;
-plot((val(2,2)^t)*vec(:,2));
-title('Time = 1');
-
-
-t = 10;
-figure;
-plot((val(1,1)^t)*vec(:,1), (val(2,2)^t)*vec(:,2));
-title('Time = 10');
-
-
-t = 100;
-figure;
-plot((val(1,1)^t)*vec(:,1), (val(2,2)^t)*vec(:,2));
-title('Time = 100');
-
-%load('trajectory90.mat','allTime');
-
-%allTime = allTime';
-%allTime = allTime(:,end-5000:10:end);
-
-eps = .06;
-return;
-
-allTime(1:60,:) = getHeadways(allTime(1:60,:));
-
-[minVal1, ~] = min(allTime(1:60,:),[],1);
-[maxVal1, max1] = max(allTime(1:60,:),[],1);
-[minVal2, ~] = min(allTime(61:end,:),[],1);
-[maxVal2, ~] = max(allTime(61:end,:),[],1);
-for c = 1:length(max1)
-    allTime(1:60,c) = (allTime(1:60,c) - minVal1(c))./(maxVal1(c)-minVal1(c));
-    allTime(1:60,c) = circshift(allTime(1:60,c), [-max1(c)+1,0]);
-    
-    allTime(61:end,c) = (allTime(61:end,c)-minVal2(c))./(maxVal2(c)-minVal2(c));
-    allTime(61:end,c) = circshift(allTime(61:end,c), [-max1(c)+1,0]);
-end
-
-D = zeros(length(allTime));
-for r = 1:length(allTime)
-    for c = 1:length(allTime)
-        D(r,c) = norm(allTime(:,r)-allTime(:,c));
-    end
-end
-
-diffusionMap(eps,D);
+scatter3(data(:,1), data(:,2), data(:,3), 20, vec(:,2),'.');
+title('Data colored by second eigen-direction with h = 40');
 
 
     function plotEps()
