@@ -2,25 +2,25 @@ function swissRoll()
 
 %% swill roll from Dsilva paper
 % number of data points
-N = 1500; 
+N = 500;
 
 % construct archemedian spiral
 a = 1;
 theta_vec = linspace(0, 4*pi, 100);
 s = 0.5*a*(theta_vec.*sqrt(1+theta_vec.^2)+log(theta_vec+sqrt(1+theta_vec.^2)));
 % height
-h = 40;
+h = 20;
 %% generate data
 % intialize random number generator
 rng(321);
 % find angles which correspond to uniform sampling along spiral
 theta = interp1(s, theta_vec, rand(N, 1)*max(s));
 % data uniformly distributed on swiss roll
-z = h*rand(N,1); 
+z = h*rand(N,1);
 x = a * cos(theta) .* theta;
 y = a * sin(theta) .* theta;
 % store all data
-data = [x y z]; 
+data = [x y z];
 
 %{
 % plot the data
@@ -43,15 +43,21 @@ eps = sqrt(median(pdist(data))/3);
 % find the diffusion map
 k = 5;
 [vec, val] = diffusionMap(eps, D,k);
+% 
+ rk3 = linearFit(vec,3)
+% rk4 = linearFit(vec,4)
+% rk5 = linearFit(vec,5)
+% 
+% things = [rk3 rk4 rk5]
 
 % plot the data colored by the eigen direction
 figure;
-scatter3(data(:,1), data(:,2), data(:,3), 20, vec(:,1),'.');
-title('Data colored by first eigen-direction with h = 40');
+scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,1),'.');
+title('Data colored by first eigen-direction with h = 20');
 
 figure;
-scatter3(data(:,1), data(:,2), data(:,3), 20, vec(:,2),'.');
-title('Data colored by second eigen-direction with h = 40');
+scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,3),'.');
+title('Data colored by fifth eigen-direction with h = 20');
 
 
     function plotEps()
