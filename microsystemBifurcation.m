@@ -77,6 +77,13 @@ for iMic = 1:steps
     sys2 = u;
 end
 
+%% plot results
+figure;
+scatter(bif(end,:), std(bif(1:numCars,:)),50,'b.');
+
+figure;
+scatter(1:steps,bif(end,:));
+
 %% function to minimize with fsolve
 % var       - state to vary in order to minimize fw
 % ref       - reference state for phase condition
@@ -88,7 +95,7 @@ end
     function fw = FW(var, ref, nCars, len, tau, W, initGuess)
         v0 = var(end);
         fw = zeros(nCars*discreteScaling+3,1);
-        fw(1:nCars*discreteScaling+2) = microFJ2(var(1:end-1), ref, nCars,...
+        fw(1:nCars*discreteScaling+2) = microFJ(var(1:end-1), ref, nCars,...
             discreteScaling*nCars , len, v0, tau);
         fw(end) = W' * (var-initGuess);
     end
