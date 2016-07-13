@@ -14,6 +14,7 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     val = seval(2:k+1,2:k+1);
     vec = sevec(:,2:k+1);
     
+    % create a Markov matrix
     function M = markovify(af)
         M = zeros(size(af));
         rsum = sum(af,2);
@@ -22,6 +23,7 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
         end
     end
 
+    % kernel function
     function dist = basicKernel(s)
         dist = exp(-s.^2/epsilon^2);
     end

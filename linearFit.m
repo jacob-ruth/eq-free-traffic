@@ -1,43 +1,33 @@
-function r_k = linearFit(evecs,k)
-m = size(evecs,1);
-PHI = evecs(:,1:k-1)'; %eigvectors are now rows
-phi = evecs(:,k)';
-ereg = median(pdist(PHI))/3;
+% Function linearFit compares the eigendirection given by an eigenvector to
+% the directions given by the previous eigenvectors
+% evecs - matrix containing all of the eigenvectors
+% k - the eigenvector to study
+% res - the linear fit of eigenvector k from the k-1 previous eigenvectors
+function res = linearFit(evecs,k)
+m = size(evecs,1);                      % number of data points
+PHI = [ones(m,1) evecs(:,1:k-1)];       % k-1 previous eigvectors in columns with column of 1s in front
+phi = evecs(:,k);                       % kth eigenvector
+pdists = pdist(PHI(:,2:end));           % pairwise distances between eigenvectors in PHI
+ereg = median(pdists)/3;                % epsilon given by the median of the pairwise distances
+sqpdists = squareform(pdists);          % mxm version of the pairwise distances
 
-minab = zeros(m,k);
+% find the linear approximation
+approx = zeros(size(phi));              % initalize an nx1 empty vector
 for i = 1:m
-    i
-    minab(i,:) = fminsearch(@(params)toMin(params,phi,PHI,i),zeros(1,k));
+    curdists = sqpdists(i,:);           % find the distances corresponding to i
+    dists = [curdists(1:i-1) , curdists(i+1:end)];  % remove the ith element
+    W = diag(kernel(dists));            % diagonalize the distances
+    curPHI = [PHI(1:i-1,:) ; PHI(i+1:end,:)];   % find the ith entries of PHI with (i,i) removed
+    curphi = [phi(1:i-1,:) ; phi(i+1:end,:)];   % find the ith entries of phi with (i,i) removed
+    
+    curPHI_W = curPHI'*W;               % compute PHI'*W
+    approx(i) = PHI(i,:)*(pinv(curPHI_W*curPHI)*(curPHI_W*curphi)); % solve y = phi*(PHI'*W*PHI)^-1*(PHI'*W*phi)
 end
-alpha = minab(:,1);
-beta = minab(:,2:end);
 
-r_k2 = 0;
-approx = zeros(1,m);
-for i = 1:m
-    approx(i) = alpha(i)+beta(i,:)*PHI(:,i);
-    r_k2 = r_k2 + (phi(i)-(alpha(i)+beta(i,:)*PHI(:,i)))^2;
-end
-diff = phi - approx;
-r_k = sqrt(r_k2/sum(phi.^2));
+res = norm(phi-approx)/norm(phi);       % compute the difference between the approximation and phi
 
-
-    function f = toMin(params,phi,P,i)
-        a = params(1);
-        b = params(2:end);
-        f = 0;
-        for j = 1:m
-            if(j == i)
-                continue;
-            end
-            dist = kernel(P(:,i),P(:,j));
-            otherpart = (phi(j)- (a+b*P(:,j)))^2;
-            
-            f = f + dist*otherpart;
-        end
-    end
-
-    function dist = kernel(r1,r2)
-        dist = exp(-norm(r1-r2)^2/ereg^2);
+    % kernel function 
+    function dist = kernel(d)
+        dist = exp(-d.^2/ereg^2);
     end
 end

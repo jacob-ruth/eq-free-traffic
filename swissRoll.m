@@ -1,81 +1,63 @@
+%% Function swissRoll samples data points from a swiss roll, constructs a 
+% diffusion map, compares the eigenvector directions, and plots the data 
+% colored by the eigenvectors
 function swissRoll()
+    %% swiss roll from Dsilva paper
+    N = 1500;                                       % number of data points
+    % construct archemedian spiral 
+    a = 1;
+    theta_vec = linspace(0, 4*pi, 100);
+    s = 0.5*a*(theta_vec.*sqrt(1+theta_vec.^2)+log(theta_vec+sqrt(1+theta_vec.^2)));
+    h = 20;                                         % height
+    %% generate data
+    rng(321);                             % intialize random number generator
+    % find angles which correspond to uniform sampling along spiral
+    theta = interp1(s, theta_vec, rand(N, 1)*max(s));
+    % data uniformly distributed on swiss roll
+    z = h*rand(N,1);
+    x = a * cos(theta) .* theta;
+    y = a * sin(theta) .* theta;
+    data = [x y z];                             % store all data
 
-%% swill roll from Dsilva paper
-% number of data points
-N = 500;
+    % calculate the distance matrix
+    D = squareform(pdist(data));
 
-% construct archemedian spiral
-a = 1;
-theta_vec = linspace(0, 4*pi, 100);
-s = 0.5*a*(theta_vec.*sqrt(1+theta_vec.^2)+log(theta_vec+sqrt(1+theta_vec.^2)));
-% height
-h = 20;
-%% generate data
-% intialize random number generator
-rng(321);
-% find angles which correspond to uniform sampling along spiral
-theta = interp1(s, theta_vec, rand(N, 1)*max(s));
-% data uniformly distributed on swiss roll
-z = h*rand(N,1);
-x = a * cos(theta) .* theta;
-y = a * sin(theta) .* theta;
-% store all data
-data = [x y z];
+    % find the value of epsilon - sqrt(5) was used by Dsliva code
+    eps = sqrt(5);
 
-%{
-% plot the data
-figure;
-scatter3(data(:,1), data(:,2), data(:,3));
-title('Swiss roll data points');
-%}
+    % find the diffusion map
+    k = 5;                               % number of eigenvectors to return
+    [vec, ~] = diffusionMap(eps, D, k);
 
-% calculate the distance matrix
-D = zeros(N);
-for r = 1:N
-    for c = 1:N
-        D(r,c) = norm(data(r,:)-data(c,:));
+    % compute how unique the eigen directions given by the vectors are
+    r = zeros(k,1);
+    r(1) = 1;                    	% assume the first direction is important
+    for i=2:k
+        r(i) = linearFit(vec, i);
     end
-end
+    % display the values of r
+    fprintf('The values of r_k are \n');
+    disp(r);
 
-% find the value of epsilon
-eps = sqrt(median(pdist(data))/3);
+    % plot the data colored by the eigen directions
+    figure;
+    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,1),'.');
+    title('Data colored by first eigen-direction');
 
-% find the diffusion map
-k = 5;
-[vec, val] = diffusionMap(eps, D,k);
-% 
- rk3 = linearFit(vec,3)
-% rk4 = linearFit(vec,4)
-% rk5 = linearFit(vec,5)
-% 
-% things = [rk3 rk4 rk5]
+    figure;
+    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,2),'.');
+    title('Data colored by second eigen-direction');
 
-% plot the data colored by the eigen direction
-figure;
-scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,1),'.');
-title('Data colored by first eigen-direction with h = 20');
+    figure;
+    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,3),'.');
+    title('Data colored by third eigen-direction');
 
-figure;
-scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,3),'.');
-title('Data colored by fifth eigen-direction with h = 20');
+    figure;
+    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,4),'.');
+    title('Data colored by fourth eigen-direction');
 
+    figure;
+    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,5),'.');
+    title('Data colored by fifth eigen-direction');
 
-    function plotEps()
-        epsilon = 0:stepSize:maxEps;
-        L = zeros(size(epsilon));
-        for iEps = 1:length(epsilon)
-            curEps = epsilon(iEps);
-            L(iEps) = sum(sum(D<curEps,1),2);
-        end
-        
-        figure;
-        loglog(epsilon,L);
-        xlabel('\epsilon','FontSize',24);
-        ylabel('L(\epsilon)','FontSize',20);
-    end
-
-    function hways = getHeadways(v)
-        futureCars = circshift(v,[-1,0]);
-        hways = mod(futureCars - v, 60);
-    end
 end
