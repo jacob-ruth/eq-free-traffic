@@ -15,7 +15,6 @@ if(plot)
         cars(i+numCars) = optimalVelocity(len/numCars, v0);
     end
     [t,allTime_1] = ode45(@microsystem,[0 finalTime],cars, options, v0);
-    %trafficOutput(:, p) = allTime_1(end,: )';
     scatter(t, std(getHeadways(allTime_1(:,1:numCars)')), '.')
     title('min \mu')
 
@@ -27,7 +26,6 @@ if(plot)
         cars(i+numCars) = optimalVelocity(len/numCars, v0);
     end
     [t,allTime_1] = ode45(@microsystem,[0 finalTime],cars, options, v0);
-    %trafficOutput(:, p) = allTime_1(end,: )';
     scatter(t, std(getHeadways(allTime_1(:,1:numCars)')), '.')
     title('max \mu')
 end
