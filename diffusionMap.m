@@ -23,6 +23,6 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     end
 
     function dist = basicKernel(s)
-        dist = exp(-s/epsilon^2);
+        dist = exp(-s.^2/epsilon^2);
     end
 end
