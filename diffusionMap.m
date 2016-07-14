@@ -1,8 +1,8 @@
 function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     %find Markov matrix and its eigenvalues/eigenvectors
-    A = basicKernel(distMatrix);
-    M = markovify(A);
-    [eigenvec,eigenval] = eig(M);
+    A = pKernel(distMatrix);
+    M = smarkovify(A);
+    [eigenvec,eigenval] = eigs(M,k+1);
     
     %sort eigenvalues and eigenvectors
     seval = diag(sort(diag(eigenval),'descend'));
@@ -11,8 +11,8 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     seval = sparse(seval);
     
     %return first k eigenvalues/vectors
-    val = seval(2:k+1,2:k+1);
-    vec = sevec(:,2:k+1);
+    val = seval(2:end,2:end);
+    vec = sevec(:,2:end);
     
     % create a Markov matrix
     function M = markovify(af)
@@ -23,8 +23,20 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
         end
     end
 
+    function SM = smarkovify(af)
+        d = diag(sum(af,2).^-.5);
+        SM = d*af*d;
+    end
+
     % kernel function
-    function dist = basicKernel(s)
-        dist = exp(-s.^2/epsilon^2);
+    function af = basicKernel(s)
+        af = exp(-s.^2/epsilon^2);
+    end
+
+    function fancy = pKernel(s)
+        af = basicKernel(s);
+        sqrtp = sqrt(sum(af,2)); % column vector of sums across rows
+        pmatrix = sqrtp * sqrtp';
+        fancy = af./pmatrix;
     end
 end

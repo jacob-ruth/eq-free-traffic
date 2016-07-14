@@ -8,7 +8,7 @@ function swissRoll()
     a = 1;
     theta_vec = linspace(0, 4*pi, 100);
     s = 0.5*a*(theta_vec.*sqrt(1+theta_vec.^2)+log(theta_vec+sqrt(1+theta_vec.^2)));
-    h = 20;                                         % height
+    h = 40;                                         % height
     %% generate data
     rng(321);                             % intialize random number generator
     % find angles which correspond to uniform sampling along spiral
@@ -23,26 +23,35 @@ function swissRoll()
     D = squareform(pdist(data));
 
     % find the value of epsilon - sqrt(5) was used by Dsliva code
-    eps = sqrt(5);
+    eps = median(D(:))/8;
 
     % find the diffusion map
     k = 5;                               % number of eigenvectors to return
-    [vec, ~] = diffusionMap(eps, D, k);
+    [vec, val] = diffusionMap(eps, D, k);
+    
+    specialPoint = data(1000,:);
+    eigCoor = vec(1000,:)
+    newData = [data(1:999,:) ; data(1001:end,:)];
+    [newvec, newval] = diffusionMap(eps, squareform(pdist(newData)),k);
+    newEigCoor = diffMapRestrict(specialPoint,newval,newvec,newData,eps)
 
     % compute how unique the eigen directions given by the vectors are
-    r = zeros(k,1);
-    r(1) = 1;                    	% assume the first direction is important
-    for i=2:k
-        r(i) = linearFit(vec, i);
-    end
-    % display the values of r
-    fprintf('The values of r_k are \n');
-    disp(r);
+%     r = zeros(k,1);
+%     r(1) = 1;                    	% assume the first direction is important
+%     for i=2:k
+%         r(i) = linearFit(vec, i);
+%     end
+%     % display the values of r
+%     fprintf('The values of r_k are \n');
+%     disp(r);
 
     % plot the data colored by the eigen directions
     figure;
+    hold on;
     scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,1),'.');
+    scatter3(data(1000,1),data(1000,2),data(1000,3),500,'go');
     title('Data colored by first eigen-direction');
+    hold off;
 
     figure;
     scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,2),'.');
