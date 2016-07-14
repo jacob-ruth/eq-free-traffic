@@ -33,7 +33,7 @@ function swissRoll()
     eigCoor = vec(1000,:)
     newData = [data(1:999,:) ; data(1001:end,:)];
     [newvec, newval] = diffusionMap(eps, squareform(pdist(newData)),k);
-    newEigCoor = diffMapRestrict(specialPoint,newval,newvec,newData,eps)
+    newEigCoor = diffMapRestrict(specialPoint',newval,newvec,newData',eps)
 
     % compute how unique the eigen directions given by the vectors are
 %     r = zeros(k,1);
