@@ -10,7 +10,7 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     sevec = eigenvec(:,ind);
     seval = sparse(seval);
     eigsigns = sevec(1,:)./abs(sevec(1,:));
-    sevec = sevec * eigsigns;
+    sevec = sevec * diag(eigsigns);
     
     %return first k eigenvalues/vectors
     val = seval(2:end,2:end);
