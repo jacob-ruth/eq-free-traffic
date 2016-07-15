@@ -48,14 +48,13 @@ function swissRoll()
     % plot the data colored by the eigen directions
     figure;
     hold on;
-    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,1),'.');
-    scatter3(data(1000,1),data(1000,2),data(1000,3),500,'go');
-    title('Data colored by first eigen-direction');
+    scatter3(data(:,1), data(:,2), data(:,3), 500, vec(:,1),'.');
+    title('Data colored by first eigen-direction (h=40)','FontSize',30);
     hold off;
 
     figure;
-    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,2),'.');
-    title('Data colored by second eigen-direction');
+    scatter3(data(:,1), data(:,2), data(:,3), 500, vec(:,2),'.');
+    title('Data colored by second eigen-direction (h=40)','FontSize',30);
 
     figure;
     scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,3),'.');
