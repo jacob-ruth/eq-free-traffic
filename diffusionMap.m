@@ -9,6 +9,8 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     [c,ind] = sort(diag(eigenval),'descend');
     sevec = eigenvec(:,ind);
     seval = sparse(seval);
+    eigsigns = sevec(1,:)./abs(sevec(1,:));
+    sevec = sevec * eigsigns;
     
     %return first k eigenvalues/vectors
     val = seval(2:end,2:end);

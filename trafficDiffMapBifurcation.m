@@ -62,7 +62,7 @@ numEigvecs = 1;
 [evecs, evals, eps] = runDiffMap(allData,numEigvecs);
 
 %% initialize secant continuation
-steps = 8;                                % number of steps to take around the curve
+steps = 100;                                % number of steps to take around the curve
 bif = zeros(2,steps);                       % array to hold the bifurcation values
 
 load('save884','trafficOutput','v0');
@@ -81,6 +81,8 @@ sigma_1 = diffMapRestrict(ref_1(1:numCars),evals,evecs,allData,eps);      %initi
 sigma_2 = diffMapRestrict(ref_2(1:numCars),evals,evecs,allData,eps);
 
 %% pseudo arc length continuation
+figure;
+hold on;
 for iEq=1:steps
     fprintf('Starting iteration %d of %d \n', iEq, steps);
     w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];          % slope of the secant line
@@ -106,14 +108,18 @@ for iEq=1:steps
     %% alternate Newton's method using fsolve
     % u = fsolve(@(u)FW(u,ref_2,w,newGuess), newGuess);
     
-    bif(:,iEq) = u;                                             % save the new solution
+    bif(:,iEq) = u;                                            % save the new solution
+    
+    scatter(bif(2,iEq),bif(1,iEq),'*');
+    drawnow;
     
     %% reset the values for the arc length continuation
     sigma_1 = sigma_2;
     v0_base1 = v0_base2;
     v0_base2 = u(2);
-    [sigma_2,~] = ler(u(1),allData,tskip+delta,u(2),evecs,evals,eps);       % find the new reference state
+    sigma_2 = u(1);                     % find the new reference state
 end
+hold off;
 
 %% plot the bifurcation diagram
 figure;

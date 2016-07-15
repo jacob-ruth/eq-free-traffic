@@ -35,7 +35,7 @@ disp(r);
 %}
 
 % evolve the diffusion map t times
-val = val^t;
+%val = val^t;
 
 %Change this to see the relationship between the eigenfunction at eigDisp
 %and the standard deviation.
