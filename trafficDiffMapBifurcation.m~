@@ -8,7 +8,7 @@ finalTime = 200000;     % reference state final time
 tskip = 300;            % times for evolving
 delta = 500;
 
-stepSize = .001;        % step size for the secant line approximation
+stepSize = .00005;        % step size for the secant line approximation
 delSigma = 0.00001;     % delta sigma used for finite difference of F
 delv0 = 0.00001;        % delta v0 used for finite difference of F
 tolerance = 10^(-5);    % tolerance for Newton's method
@@ -61,6 +61,16 @@ end
 numEigvecs = 1;
 [evecs, evals, eps] = runDiffMap(allData,numEigvecs);
 
+[partevecs, partevals, peps] = runDiffMap(allData(:,1:end-50),numEigvecs);
+restricted = zeros(50,1);
+for iData = 1:50
+    restricted(iData) = diffMapRestrict(allData(:,end-iData+1),partevals,partevecs,allData(:,1:end-50),peps);
+end
+figure;
+hold on;
+scatter(std(allData(:,1:end-50)),partevecs,'b.');
+scatter(std(allData(:,end-49:end)), 
+
 figure;
 hold on;
 scatter(1:1:length(allData),evecs,'b.');
@@ -68,7 +78,7 @@ ylabel('\Phi_1');
 drawnow;
 
 %% initialize secant continuation
-steps = 50;                                % number of steps to take around the curve
+steps = 500;                                % number of steps to take around the curve
 bif = zeros(2,steps);                       % array to hold the bifurcation values
 
 load('save884','trafficOutput','v0');
@@ -163,7 +173,7 @@ scatter(bif(2,:),bif(1,:),'*');
 % new_state - the final state of the evolution, which can be used as a
 %               future reference state
     function [sigma,new_state, sigma2, new_state2] = ler(newval,orig,t,v0,eigvecs,eigvals,lereps,tReference)
-        liftedHways = diffMapLift(newval, eigvecs,eigvals,lereps, orig);
+        liftedHways = diffMapLift(newval, eigvecs, orig);
         liftedPosns = cumsum(liftedHways);
         liftedVel = optimalVelocity(liftedHways,v0);
         lifted = [liftedPosns ; liftedVel];

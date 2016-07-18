@@ -1,22 +1,21 @@
-function l = diffMapLift(newVal, evec, oldData)
-%sort eigenvalues and eigenvectors
-[sevec,ind] = sort(evec,'ascend');
-sdata = oldData(:,ind);
-idx = 1;
+function l = diffMapLift(newVal, evec, eval, eps, oldData)
+[~,closeidx] = min(abs(evec-newVal));
+close = oldData(:,closeidx);
 
-while(sevec(idx) < newVal)
-    idx = idx + 1;
-end
-lowidx = idx - 1;
-val = sevec(idx);
+soptions = saoptimset('ObjectiveLimit',1e-7);
 
-if(val == newVal)
-    l = sdata(:,idx);
-else    
-    lowdist = newVal - sevec(lowidx);
-    highdist = sevec(lowidx + 1) - newVal;
-    
-    l = (lowdist/(lowdist + highdist))*sdata(:,lowidx)+...
-        (highdist/(lowdist + highdist))*sdata(:,lowidx+1);
-end
+tic;
+[l,fval] = simulannealbnd(@(x)toMin(x,newVal,evec,eval,eps,oldData),close,...
+    zeros(length(close),1),60*ones(length(close),1),...
+    soptions);
+fval
+toc;
+
+
+    function f = toMin(x,target,evec,eval,eps,old)
+        lambda = 1;
+        f = lambda * (diffMapRestrict(x,eval,evec,old,eps)-target)^2;
+
+        f = f + abs(sum(x) - 60);
+    end
 end

@@ -12,9 +12,16 @@ dist = zeros(size(origData,2),1);
 for iCol = 1:size(origData,2)
     dist(iCol) = norm(newData - origData(:,iCol));
 end
-w = basicKernel(dist);
-k = (1/sum(w))*w;
-pnew = (evecs' * k)./diag(evals);
+basic = basicKernel(dist);
+ey = basic/size(origData,2);
+af = basicKernel(squareform(pdist(origData')));
+rsums = sum(af,2);
+eyp = rsums/size(origData,2);
+
+denom = sqrt(ey .* eyp);
+k = (basic./denom)/size(origData,2);
+pnewsym = (evecs' * k)./diag(evals);
+pnew = pnewsym/(diag(af).^.5)
 
     function af = basicKernel(s)
         af = exp(-s.^2/eps^2);
