@@ -7,8 +7,6 @@ function [vec,val,eps] = runDiffMap(data,k)
 % build the data from the simulation results
 allTime = data; % data should be passed in as headways
 
-stdev = std(allTime, 0, 1);             % find the standard deviations
-
 % calcuate the pairwise distances between data points
 D = zeros(length(allTime));
 for r = 1:length(allTime)
@@ -19,7 +17,6 @@ end
 
 eps = median(D(:))/3; % choose epsilon for the kernel based on the pairwise distances
 
-t = 3;      % number of timesteps to evolve the diffusion map
 [vec,val] = diffusionMap(eps,D,k);          % calculate the diffusion map
 
 % calculate how unique each eigen direction is
@@ -29,39 +26,7 @@ r(1) = 1;
 for j = 2:k
     r(j) = linearFit(vec,j);
 end
-% display the eigen direction computation results
-fprintf('The r_k values are: \n');
-disp(r);
 %}
-
-% evolve the diffusion map t times
-%val = val^t;
-
-%Change this to see the relationship between the eigenfunction at eigDisp
-%and the standard deviation.
-%{
-eigDisp = 1;
-stry = sprintf('Eigenvector %i',eigDisp);
-figure;
-hold on;
-scatter(stdev, vec(:,eigDisp),'b.')
-scatter(newstdev, dvec(eigDisp, :),500,'r.')
-xlabel('\sigma');
-ylabel(stry);
-%}
-
-
-% Plot relationship between first three eigenvectors
-%{
-figure;
-hold on;
-scatter(vec(:,1), vec(:,2),100,'b.');
-scatter(dvec(1,:),dvec(2,:),100,'r.');
-hold off;
-xlabel('Eigenvector 1');
-ylabel('Eigenvector 2');
-%}
-
 
     % plotEps creates a log-log plot of the number of data points that are
     % less than epsilon vs. epsilon
