@@ -185,7 +185,7 @@ title('interpolated sigmas');
         [~,evo] = ode45(@microsystem,[0 t],lifted, options,v0);
         if (nargin > 7)
             [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
-            evo2Cars = evo(end, 1:numCars)';       
+            evo2Cars = evo2(end, 1:numCars)';       
             evo2Cars = shiftMax(getHeadways(evo2Cars));
             sigma2 = diffMapRestrict(evo2Cars,eigvals,eigvecs, orig, lereps);
             
