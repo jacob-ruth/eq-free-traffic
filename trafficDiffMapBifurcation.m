@@ -8,7 +8,7 @@ finalTime = 200000;     % reference state final time
 tskip = 300;            % times for evolving
 delta = 500;
 
-stepSize = .001;        % step size for the secant line approximation
+stepSize = .0001;        % step size for the secant line approximation
 delSigma = 0.00001;     % delta sigma used for finite difference of F
 delv0 = 0.00001;        % delta v0 used for finite difference of F
 tolerance = 10^(-5);    % tolerance for Newton's method
@@ -17,6 +17,7 @@ v0_base1 = 0.91;        % initial velocities for secant line approximation
 v0_base2 = 0.9;
 
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
+foptions = optimset('TolFun',1e-20);
 
 %% initialize car posoitions and velocities
 cars_1 = zeros(2*numCars, 1);
@@ -46,9 +47,14 @@ load('jacobOutput','joutput885');
 load('jacobOutput2','j2output885');
 load('jacobOutput3', 'j3output885');
 load('jacobOutput7', 'j7output885');
-%load('saveData','trafficOutput');
+load('saveData','trafficOutput');
 
-loadedData = [joutput885 j2output885 j3output885 j7output885];
+loadedData = [joutput885 j2output885 j3output885 j7output885 trafficOutput];
+
+load('885low','trafficOutput');
+
+loadedData = [loadedData trafficOutput];
+
 allData = getHeadways(loadedData(1:60,:));
 
 [~, max1] = max(allData(1:60,:),[],1);  % locate the max headway for each data point
@@ -60,6 +66,8 @@ end
 
 numEigvecs = 1;
 [evecs, evals, eps] = runDiffMap(allData,numEigvecs);
+
+% diffMapRestrict(diffMapLift(-0.002,evecs,evals,eps,allData),evals,evecs,allData,eps)
 
 figure;
 hold on;
@@ -87,8 +95,6 @@ sigma_1 = diffMapRestrict(ref_1(1:numCars),evals,evecs,allData,eps);      %initi
 sigma_2 = diffMapRestrict(ref_2(1:numCars),evals,evecs,allData,eps);
 
 %% pseudo arc length continuation
-figure;
-hold on;
 for iEq=1:steps
     fprintf('Starting iteration %d of %d \n', iEq, steps);
     w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];          % slope of the secant line
@@ -100,23 +106,26 @@ for iEq=1:steps
     k=1;                            	% Newton's method counter
     
     %% Newton and that other guy's method
-    while(first ||(norm(invD*[f;neww])>tolerance && k < 20))
-        first = false;
-        fprintf('\t Newton iteration: %d \n', k);
-        f = F(allData, u(1),u(2), evecs, evals, eps);                                % calculcate the function to zero
-        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
-        Df = jacobian(allData, u(1), u(2), w, evecs, evals, eps);                    % find the jacobian
-        invD = Df^(-1);
-        u = u - invD*[f;neww];                                  % perform the Newton step
-        k = k + 1;
-    end
+    %     while(first ||(norm(invD*[f;neww])>tolerance && k < 20))
+    %         first = false;
+    %         fprintf('\t Newton iteration: %d \n', k);
+    %         f = F(allData, u(1),u(2), evecs, evals, eps);                                % calculcate the function to zero
+    %         neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
+    %         Df = jacobian(allData, u(1), u(2), w, evecs, evals, eps);                    % find the jacobian
+    %         invD = Df^(-1);
+    %         u = u - invD*[f;neww]                                  % perform the Newton step
+    %         k = k + 1;
+    %
+    %         scatter(20*(iEq-1) + k, u(1),200,'g.');
+    %         drawnow;
+    %     end
     
     %% alternate Newton's method using fsolve
-    % u = fsolve(@(u)FW(u,ref_2,w,newGuess), newGuess);
+    u = fsolve(@(u)FW(u,allData,w,newGuess,evecs,evals,eps), newGuess,foptions)
     
     bif(:,iEq) = u;                                            % save the new solution
     
-    scatter(iEq,bif(1,iEq),'r.');
+    scatter(20*iEq,bif(1,iEq),200,'r.');
     drawnow;
     
     %% reset the values for the arc length continuation
@@ -130,6 +139,12 @@ hold off;
 %% plot the bifurcation diagram
 figure;
 scatter(bif(2,:),bif(1,:),'*');
+
+sig = interp1(evecs,std(allData),bif(1,:));
+
+figure;
+scatter(bif(2,:),sig);
+title('interpolated sigmas');
 
 %save('eqFreeBif.mat','bif');
 
@@ -145,9 +160,9 @@ scatter(bif(2,:),bif(1,:),'*');
 %
 % RETURNS:
 % fw    - the functions F and w evaluated at these parameters
-    function fw = FW(u,ref,W,newGuess)
+    function fw = FW(u,ref,W,newGuess,evecs,evals,lereps)
         fw = zeros(2,1);
-        fw(1) = F(ref,u(1),u(2));
+        fw(1) = F(ref,u(1),u(2),evecs,evals,lereps);
         fw(2) = W(1)*(u(1)-newGuess(1)) + W(2)*(u(2) - newGuess(2));
     end
 
@@ -170,10 +185,14 @@ scatter(bif(2,:),bif(1,:),'*');
         [~,evo] = ode45(@microsystem,[0 t],lifted, options,v0);
         if (nargin > 7)
             [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
-            sigma2 = diffMapRestrict(getHeadways(evo2(end,1:numCars)'),eigvals,eigvecs, orig, lereps);
+            evo2Cars = evo(end, 1:numCars)';       
+            evo2Cars = shiftMax(getHeadways(evo2Cars));
+            sigma2 = diffMapRestrict(evo2Cars,eigvals,eigvecs, orig, lereps);
+            
         end
         evoCars = evo(end, 1:numCars)';
-        sigma = diffMapRestrict(getHeadways(evoCars), eigvals, eigvecs, orig, lereps);
+        evoCars = shiftMax(getHeadways(evoCars));
+        sigma = diffMapRestrict(evoCars, eigvals, eigvecs, orig, lereps);
         if(nargout >= 2)
             new_state = evo(end,1:2*numCars)';
         end
@@ -253,6 +272,17 @@ scatter(bif(2,:),bif(1,:),'*');
     function hways = getHeadways(v)
         futureCars = circshift(v,[-1,0]);
         hways = mod(futureCars - v, len);
+    end
+
+%% function to circshift max to beginning
+    function c = shiftMax(hways)
+        [~, maxH] = max(hways,[],1);  % locate the max headway for each data point
+        c = zeros(size(hways));
+        
+        % align all of the headways with the max in the front
+        for iCar = 1:length(maxH)
+            c(:,iCar) = circshift(hways(:,iCar), [-maxH(iCar)+1,0]);
+        end
     end
 
 %% ODE that governs individual cars

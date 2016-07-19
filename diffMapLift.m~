@@ -1,11 +1,21 @@
-function l = diffMapLift(newVal, evec, oldData)
-%sort eigenvalues and eigenvectors
-[sevec,ind] = sort(evec,'descend');
-sdata = oldData(:,ind);
+function l = diffMapLift(newVal, evec, eval, eps, oldData)
+[~,closeidx] = min(abs(evec-newVal));
+close = oldData(:,closeidx);
 
-[val idx] = min(abs(sevec - newVal));
-if(val == newVal)
-    l = sdata(:,idx);
-else if(val < newVal)
-        
+soptions = saoptimset('TolFu',1e-7);
+
+tic;
+[l,fval] = simulannealbnd(@(x)toMin(x,newVal,evec,eval,eps,oldData),close,...
+    zeros(length(close)),60*ones(length(close)),...
+    soptions);
+fval
+toc;
+
+
+    function f = toMin(x,target,evec,eval,eps,old)
+        lambda = 1;
+        f = lambda * (diffMapRestrict(x,eval,evec,old,eps)-target)^2;
+
+        f = f + abs(sum(x) - 60);
+    end
 end
