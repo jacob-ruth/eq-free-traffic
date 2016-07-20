@@ -8,12 +8,7 @@ function [vec,val,eps] = runDiffMap(data,k)
 allTime = data; % data should be passed in as headways
 
 % calcuate the pairwise distances between data points
-D = zeros(length(allTime));
-for r = 1:length(allTime)
-    for c = 1:length(allTime)
-        D(r,c) = norm(allTime(:,r)-allTime(:,c));
-    end
-end
+D = squareform(pdist(allTime'));
 
 eps = median(D(:))/3; % choose epsilon for the kernel based on the pairwise distances
 
