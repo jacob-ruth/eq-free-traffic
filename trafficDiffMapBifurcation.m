@@ -12,7 +12,7 @@ delv0 = 0.00001;        % delta v0 used for finite difference of F
 tolerance = 10^(-5);    % tolerance for Newton's method
 
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
-foptions = optimset('TolFun',1e-8);              % fsolve options
+foptions = optimset('TolFun',1e-6);              % fsolve options
 
 %% load diffusion map data
 load('jacobOutput','joutput885');
