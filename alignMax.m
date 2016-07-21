@@ -27,8 +27,8 @@ function aligned = alignMax(data, position)
 %       maxvals - the 3 values around/including the maximum
     function [maxinds, maxvals] = getTop3(hways)
         [maxhw,maxind] = max(hways,[],1);                   % find index and value of maximum
-        ind1 = mod(maxind-2,numCars)+1;                     % find point to the left
-        ind3 = mod(maxind,numCars)+1;                       % point to the right
+        ind1 = mod(maxind-2, n)+1;                     % find point to the left
+        ind3 = mod(maxind, n)+1;                       % point to the right
         maxinds = [ind1 ; maxind ; ind3];                   % all of the indices together
         maxvals = [hways(ind1) ; maxhw ; hways(ind3)];      % values at the indices
     end
