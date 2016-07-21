@@ -2,26 +2,24 @@ function l = diffMapLift(newVal, evec, eval, eps, oldData)
 
 fprintf('lifting to %d \n',newVal);
 
-[~,closeidx] = min(abs(evec-newVal));
+closeidxs = dsearchn(evec,newVal');
+closeidx = closeidxs(1);
 close = oldData(:,closeidx);
 
-soptions = saoptimset('ObjectiveLimit',1e-7);
+fprintf('initial guess: %d \n', evec(closeidx,:));
 
-if(newVal < min(evec))
-    newVal
-end
+soptions = saoptimset('ObjectiveLimit',1e-14);
 
 
-[l,fval] = simulannealbnd(@(x)toMin(x,newVal,evec,eval,eps,oldData),close,...
+[l,~] = simulannealbnd(@(x)toMin(x,newVal,evec,eval,eps,oldData),close,...
     zeros(length(close),1),60*ones(length(close),1),...
     soptions);
-% fprintf('f value = %d \n',fval);
 
+norm(l - close)
 
     function f = toMin(x,target,evec,eval,eps,old)
-        lambda = 1;
-        f = lambda * (diffMapRestrict(x,eval,evec,old,eps)-target)^2;
-
+        lambda = 100;
+        f = lambda * norm(diffMapRestrict(x,eval,evec,old,eps)-target)^2;
         f = f + abs(sum(x) - 60);
     end
 end

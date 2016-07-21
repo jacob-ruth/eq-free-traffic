@@ -26,13 +26,24 @@ load('885low','trafficOutput');
 loadedData = [loadedData trafficOutput];
 
 allData = getHeadways(loadedData(1:numCars, :));        % headway data for the diffusion map
-% interpolate and align max headways here
+%[max3indx, max3val] = getTop3(allData);                 % interpolate and align max headways
+
+allData = shiftMax(allData,30);
+for iFun = 1:size(allData,2)                            % max headway will always be at 60
+    [max3indx, max3val] = getTop3(allData(:,iFun));
+    maxfun = polyfit(max3indx,max3val,2);
+    actualidx = -maxfun(2)/(2*maxfun(1));
+    fn = csape(1:1:numCars,allData(:,iFun),'periodic');
+    newpts = mod(linspace(1,numCars,numCars) + actualidx,numCars);
+    newvals = fnval(fn,newpts);
+    allData(:,iFun) = newvals';
+end
 
 numEigvecs = 1;                                         % number of eigenvectors to return
 [evecs, evals, eps] = runDiffMap(allData,numEigvecs);   % run the diffusion map
 
 % plot sigma vs eigenvector 1
-figure; 
+figure;
 hold on;
 scatter(std(allData), evecs,'b.');
 xlabel('\sigma');
@@ -147,7 +158,7 @@ ylabel('\Phi_1');
         [~,evo] = ode45(@microsystem,[0 t],lifted, options,v0);
         if (nargin > 7)
             [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
-            evo2Cars = evo2(end, 1:numCars)';       
+            evo2Cars = evo2(end, 1:numCars)';
             evo2Cars = shiftMax(getHeadways(evo2Cars));
             sigma2 = diffMapRestrict(evo2Cars,eigvals,eigvecs, orig, lereps);
         end
@@ -266,6 +277,14 @@ ylabel('\Phi_1');
         u = zeros(2*numCars,1);
         u(1:numCars,1) = colCars(numCars+1:2*numCars,1);
         u(numCars+1:2*numCars,1) = invT*(optimalVelocity(headways,v0) - colCars(numCars+1:2*numCars,1));
+    end
+
+    function [maxinds, maxvals] = getTop3(hways)
+        [maxhw,maxind] = max(hways,[],1);
+        ind1 = mod(maxind-2,numCars)+1;
+        ind3 = mod(maxind,numCars)+1;
+        maxinds = [ind1 ; maxind ; ind3];
+        maxvals = [hways(ind1) ; maxhw ; hways(ind3)];
     end
 
 end
