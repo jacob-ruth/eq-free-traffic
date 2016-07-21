@@ -21,21 +21,20 @@ load('jacobOutput3', 'j3output885');
 load('jacobOutput7', 'j7output885');
 load('saveData','trafficOutput');
 loadedData = [joutput885 j2output885 j3output885 j7output885 trafficOutput];
-
 load('885low','trafficOutput');
 loadedData = [loadedData trafficOutput];
 
 allData = getHeadways(loadedData(1:numCars, :));        % headway data for the diffusion map
-%[max3indx, max3val] = getTop3(allData);                 % interpolate and align max headways
 
-allData = shiftMax(allData,30);
+%% align the maximum of each wave at the last position
+allData = shiftMax(allData,30);                         % initially move the max to 30 to avoid indexing errors
 for iFun = 1:size(allData,2)                            % max headway will always be at 60
-    [max3indx, max3val] = getTop3(allData(:,iFun));
-    maxfun = polyfit(max3indx,max3val,2);
-    actualidx = -maxfun(2)/(2*maxfun(1));
-    fn = csape(1:1:numCars,allData(:,iFun),'periodic');
-    newpts = mod(linspace(1,numCars,numCars) + actualidx,numCars);
-    newvals = fnval(fn,newpts);
+    [max3indx, max3val] = getTop3(allData(:,iFun));     % find the maximum 3 data points and indices
+    maxfun = polyfit(max3indx,max3val,2);               % fit a quadratic to the max 3 data points
+    actualidx = -maxfun(2)/(2*maxfun(1));               % find the index of the max of the wave
+    fn = csape(1:1:numCars,allData(:,iFun),'periodic'); % interpolate the wave profile
+    newpts = mod(linspace(1,numCars,numCars) + actualidx,numCars);  % find the shift needed to move the max to the end
+    newvals = fnval(fn,newpts);                         % move the max to the end and get the new headway values
     allData(:,iFun) = newvals';
 end
 
