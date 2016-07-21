@@ -2,8 +2,6 @@ function trafficDiffMapBifurcation()
 h = 1.2;                % optimal velocity parameter
 len = 60;               % length of the ring road
 numCars = 60;           % number of cars
-mu = .1;                % initial position parameter
-finalTime = 200000;     % reference state final time
 
 tskip = 300;            % times for evolving
 delta = 500;
@@ -13,86 +11,49 @@ delSigma = 0.00001;     % delta sigma used for finite difference of F
 delv0 = 0.00001;        % delta v0 used for finite difference of F
 tolerance = 10^(-5);    % tolerance for Newton's method
 
-v0_base1 = 0.91;        % initial velocities for secant line approximation
-v0_base2 = 0.9;
-
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
-foptions = optimset('TolFun',1e-20);
+foptions = optimset('TolFun',1e-8);              % fsolve options
 
-%% initialize car posoitions and velocities
-cars_1 = zeros(2*numCars, 1);
-cars_2 = zeros(2*numCars, 1);
-for i = 1:numCars
-    cars_1(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
-    cars_1(i+numCars) = optimalVelocity(len/numCars, v0_base1);
-    
-    cars_2(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
-    cars_2(i+numCars) = optimalVelocity(len/numCars, v0_base2);
-end
-
-%% initialize the reference states if not already saved
-%{
-	[t1,allTime_1] = ode45(@microsystem,[0 finalTime],cars_1, options, v0_base1);
-	ref_1 = allTime_1(end,:)';
-	[t2,allTime_2] = ode45(@microsystem,[0 finalTime],cars_2, options, v0_base2);
-	ref_2 = allTime_2(end,:)';
-	save('refStats.mat','ref_1','ref_2'); % save reference states
-%}
-
-% load the reference states if they have already been calculated
-% load('refStats919.mat','ref_1','ref_2');
-
-%% load diffusion map
+%% load diffusion map data
 load('jacobOutput','joutput885');
 load('jacobOutput2','j2output885');
 load('jacobOutput3', 'j3output885');
 load('jacobOutput7', 'j7output885');
 load('saveData','trafficOutput');
-
 loadedData = [joutput885 j2output885 j3output885 j7output885 trafficOutput];
 
 load('885low','trafficOutput');
-
 loadedData = [loadedData trafficOutput];
 
-allData = getHeadways(loadedData(1:60,:));
+allData = getHeadways(loadedData(1:numCars, :));        % headway data for the diffusion map
+% interpolate and align max headways here
 
-[~, max1] = max(allData(1:60,:),[],1);  % locate the max headway for each data point
+numEigvecs = 1;                                         % number of eigenvectors to return
+[evecs, evals, eps] = runDiffMap(allData,numEigvecs);   % run the diffusion map
 
-% align all of the headways with the max in the front
-for c = 1:length(max1)
-    allData(1:60,c) = circshift(allData(1:60,c), [-max1(c)+1,0]);
-end
-
-numEigvecs = 1;
-[evecs, evals, eps] = runDiffMap(allData,numEigvecs);
-
-% diffMapRestrict(diffMapLift(-0.002,evecs,evals,eps,allData),evals,evecs,allData,eps)
-
-figure;
+% plot sigma vs eigenvector 1
+figure; 
 hold on;
-scatter(1:1:length(allData),evecs,'b.');
+scatter(std(allData), evecs,'b.');
+xlabel('\sigma');
 ylabel('\Phi_1');
-drawnow;
 
 %% initialize secant continuation
 steps = 50;                                % number of steps to take around the curve
 bif = zeros(2,steps);                       % array to hold the bifurcation values
 
+% initialize the first reference state
 load('save884','trafficOutput','v0');
 ref_2 = getHeadways(trafficOutput(1:60));
 v0_base2 = v0;
-[~,max2] = max(ref_2);
-ref_2 = circshift(ref_2,[1-max2,0]);
 
+% initialize the second reference state
 load('885ref','trafficOutput','v0');
 ref_1 = getHeadways(trafficOutput(1:60));
-[~,max1] = max(ref_1);
-ref_1 = circshift(ref_1,[1-max1,0]);
 v0_base1 = v0;
 
-sigma_1 = diffMapRestrict(ref_1(1:numCars),evals,evecs,allData,eps);      %initial sigma values for secant line approximation
-sigma_2 = diffMapRestrict(ref_2(1:numCars),evals,evecs,allData,eps);
+sigma_1 = diffMapRestrict(ref_1,evals,evecs,allData,eps);      %initial sigma values for secant line approximation
+sigma_2 = diffMapRestrict(ref_2,evals,evecs,allData,eps);
 
 %% pseudo arc length continuation
 for iEq=1:steps
@@ -115,9 +76,6 @@ for iEq=1:steps
     %         invD = Df^(-1);
     %         u = u - invD*[f;neww]                                  % perform the Newton step
     %         k = k + 1;
-    %
-    %         scatter(20*(iEq-1) + k, u(1),200,'g.');
-    %         drawnow;
     %     end
     
     %% alternate Newton's method using fsolve
@@ -125,7 +83,9 @@ for iEq=1:steps
     
     bif(:,iEq) = u;                                            % save the new solution
     
-    scatter(20*iEq,bif(1,iEq),200,'r.');
+    % interpolate and plot the new value on sigma vs eigenvector 1
+    sig = interp1(evecs,std(allData),bif(1,iEq));
+    scatter(sig, bif(1,iEq), 'r*');
     drawnow;
     
     %% reset the values for the arc length continuation
@@ -134,19 +94,21 @@ for iEq=1:steps
     v0_base2 = u(2);
     sigma_2 = u(1);                     % find the new reference state
 end
-hold off;
 
 %% plot the bifurcation diagram
 figure;
 scatter(bif(2,:),bif(1,:),'*');
+xlabel('v0');
+ylabel('\Phi_1');
 
+% interpolate back to the standard deviation values
 sig = interp1(evecs,std(allData),bif(1,:));
-
+% plot the bifurcation diagram using standard deviation coordinates
 figure;
 scatter(bif(2,:),sig);
 title('interpolated sigmas');
-
-%save('eqFreeBif.mat','bif');
+xlabel('v0');
+ylabel('\Phi_1');
 
 %% functions
 
@@ -188,7 +150,6 @@ title('interpolated sigmas');
             evo2Cars = evo2(end, 1:numCars)';       
             evo2Cars = shiftMax(getHeadways(evo2Cars));
             sigma2 = diffMapRestrict(evo2Cars,eigvals,eigvecs, orig, lereps);
-            
         end
         evoCars = evo(end, 1:numCars)';
         evoCars = shiftMax(getHeadways(evoCars));
@@ -275,13 +236,18 @@ title('interpolated sigmas');
     end
 
 %% function to circshift max to beginning
-    function c = shiftMax(hways)
+    function c = shiftMax(hways, center)
+        if(nargin>1)
+            shift = center + 1;
+        else
+            shift = 1;
+        end
         [~, maxH] = max(hways,[],1);  % locate the max headway for each data point
         c = zeros(size(hways));
         
         % align all of the headways with the max in the front
         for iCar = 1:length(maxH)
-            c(:,iCar) = circshift(hways(:,iCar), [-maxH(iCar)+1,0]);
+            c(:,iCar) = circshift(hways(:,iCar), [-maxH(iCar)+shift,0]);
         end
     end
 
