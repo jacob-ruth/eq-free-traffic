@@ -2,10 +2,17 @@
 % builds a diffusion map, compares the eigen directions given by the
 % diffusion map eigenvectors, and plots relevent eigenvectors scaled by
 % corresponding eigenvalues
+% INPUT:
+% data - simulation data for building the diffusion map
+% k - the number of eigenvectors to return
+% RETURNS:
+% vec - the eigenvectors from the diffusion map
+% val - the eigenvalues from the diffusion map
+% eps - the value of epsilon used by the diffusion map
 function [vec,val,eps] = runDiffMap(data,k)
 
 % build the data from the simulation results
-allTime = data; % data should be passed in as headways
+allTime = data;
 
 % calcuate the pairwise distances between data points
 D = squareform(pdist(allTime'));
@@ -25,6 +32,7 @@ end
 
     % plotEps creates a log-log plot of the number of data points that are
     % less than epsilon vs. epsilon
+    % distances - the pairwise distances between data points
     function plotEps(distances)
         % create the values of epsilon to test from 0 to maxEps by stepSize
         stepSize = .0001;
@@ -41,11 +49,5 @@ end
         loglog(epsilon,L);
         xlabel('\epsilon','FontSize',24);
         ylabel('L(\epsilon)','FontSize',20);
-    end
-
-    % getHeadways returns headways between 60 cars given their positions
-    function hways = getHeadways(v)
-        futureCars = circshift(v,[-1,0]);
-        hways = mod(futureCars - v, 60);
     end
 end
