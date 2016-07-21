@@ -278,12 +278,18 @@ ylabel('\Phi_1');
         u(numCars+1:2*numCars,1) = invT*(optimalVelocity(headways,v0) - colCars(numCars+1:2*numCars,1));
     end
 
+%% get the values and indices surrounding the maximum of each profile
+% hways - the profile
+%
+% returns:
+%       maxinds - the 3 indices around/including the maximum
+%       maxvals - the 3 values around/including the maximum
     function [maxinds, maxvals] = getTop3(hways)
-        [maxhw,maxind] = max(hways,[],1);
-        ind1 = mod(maxind-2,numCars)+1;
-        ind3 = mod(maxind,numCars)+1;
-        maxinds = [ind1 ; maxind ; ind3];
-        maxvals = [hways(ind1) ; maxhw ; hways(ind3)];
+        [maxhw,maxind] = max(hways,[],1);                   % find index and value of maximum
+        ind1 = mod(maxind-2,numCars)+1;                     % find point to the left
+        ind3 = mod(maxind,numCars)+1;                       % point to the right
+        maxinds = [ind1 ; maxind ; ind3];                   % all of the indices together
+        maxvals = [hways(ind1) ; maxhw ; hways(ind3)];      % values at the indices
     end
 
 end
