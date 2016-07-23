@@ -13,7 +13,11 @@ tempMin = 0.00001;                                      % ending temeprature
 alpha = 0.9;
 tolerance = 1.5*10^(-7);
 
+soptions = saoptimset('ObjectiveLimit',1e-5,'AnnealingFcn',@annealingboltz,'InitialTemperature',1e-3);
+soptions.ReannealInterval = 50;
+
 %% run simulated annealing
+%{
 while(temp > tempMin && optimalCost > tolerance)
     i = 1;
     while(i <= 100)
@@ -36,6 +40,7 @@ while(temp > tempMin && optimalCost > tolerance)
 end
 
 l = optimal;                                % return the best solution found
+%}
 
 % function to optimize
     function f = toMin(x,target,evec,eval,eps,old)
