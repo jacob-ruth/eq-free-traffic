@@ -1,10 +1,21 @@
-function genTrafficData(dataPoints, v0, muMin, muMax,tMin, tMax, dataFile, plot)
+%% Generates data for traffic
+% dataPoints-  number of different simulations to run
+% dataPointsPer- the number of different sample points, evenly spaced, for
+%                   each simulation
+% v0-           the v0 to run each simulation
+% muMin-        min perturbation for sin initial condition
+% muMax-        max perturnbation for sin initial condition
+%               actual mu will be evenly distributed between muMin and
+%               muMax
+% tMax-         the final time to stop the simulation at
+% dataFile-     output file name, should be .mat
+% plot-         bool, if it should be plot or not
+function genTrafficData(dataPoints,dataPointsPer, v0, muMin, muMax,tMax, dataFile, plot)
 h = 1.2;
 len = 60;
 numCars = 60;
 options = odeset('AbsTol',10^-8,'RelTol',10^-8);
-buildSteps = dataPoints;
-trafficOutput = zeros(2*numCars, buildSteps);
+trafficOutput2 = zeros(2*numCars, dataPoints*dataPointsPer);
 cars = zeros(numCars*2, 1);
 if(plot)
     figure;
@@ -15,9 +26,7 @@ if(plot)
         cars(i+numCars) = optimalVelocity(len/numCars, v0);
     end
     [t,allTime_1] = ode45(@microsystem,[0 finalTime],cars, options, v0);
-    scatter(t, std(getHeadways(allTime_1(:,1:numCars)')), '.')
-    title('min \mu')
-
+    scatter(t, std(getHeadways(allTime_1(:,1:numCars)')), '.')    
     figure;
     mu = muMax;
     finalTime = tMax;
@@ -28,19 +37,22 @@ if(plot)
     [t,allTime_1] = ode45(@microsystem,[0 finalTime],cars, options, v0);
     scatter(t, std(getHeadways(allTime_1(:,1:numCars)')), '.')
     title('max \mu')
+    return;
 end
 
-for p = 1: buildSteps
-    mu = muMin + rand*(muMax - muMin);
-    finalTime = tMin + rand*(tMax - tMin);
+for p = 1:dataPoints
+    mu = muMin + (p/dataPoints)*(muMax - muMin);
+    finalTime = tMax;
     for i = 1:(numCars)
         cars(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
         cars(i+numCars) = optimalVelocity(len/numCars, v0);
     end
     [t,allTime_1] = ode45(@microsystem,[0 finalTime],cars, options, v0);
-    trafficOutput(:, p) = allTime_1(end,: )';
+    tPoints = linspace(0, finalTime,dataPointsPer);
+    points = interp1(t,allTime_1,tPoints)';
+    trafficOutput2(:,((p - 1)*dataPointsPer + 1):((p)*dataPointsPer)) = points;
 end;
-save(dataFile,'trafficOutput', 'v0', 'muMin', 'muMax', 'tMin', 'tMax');
+save(dataFile,'trafficOutput2', 'v0', 'muMin', 'muMax', 'tMin', 'tMax');
 
 
 
