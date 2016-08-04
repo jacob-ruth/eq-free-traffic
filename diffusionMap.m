@@ -1,7 +1,7 @@
 function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     %find Markov matrix and its eigenvalues/eigenvectors
     A = basicKernel(distMatrix);
-    M = smarkovify(A);
+    M = markovify(A);
     [eigenvec,eigenval] = eigs(M,k+1);
     
     %sort eigenvalues and eigenvectors
@@ -16,8 +16,8 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     val = seval(2:end,2:end);
     vec = sevec(:,2:end);
     
-    undo = diag(sum(A,2).^-.5);
-    vec = undo * vec;
+    %undo = diag(sum(A,2).^-.5);
+    %vec = undo * vec;
     
     % create a Markov matrix
     function M = markovify(af)

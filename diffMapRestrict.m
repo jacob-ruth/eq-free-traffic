@@ -7,18 +7,14 @@
 %
 % returns diffusion map embedding for new data using the Nystrom extension
 % in a column vector
-function [pnew, nystrompnew] = diffMapRestrict(newData,evals,evecs,origData,eps)
+function pnew = diffMapRestrict(newData,evals,evecs,origData,eps)
 dist = zeros(size(origData,2),1);
 for iCol = 1:size(origData,2)
     dist(iCol) = norm(newData - origData(:,iCol));
 end
 w = basicKernel(dist);
 k = (1/sum(w))*w;
-
-nystrompnew = (evecs' * k)./diag(evals);
-
-
-pnew = nystrompnew;
+pnew = (evecs' * k)./diag(evals);
 
     function af = basicKernel(s)
         af = exp(-s.^2/eps^2);

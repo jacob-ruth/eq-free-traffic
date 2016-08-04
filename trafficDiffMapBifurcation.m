@@ -2,114 +2,85 @@ function trafficDiffMapBifurcation()
 h = 1.2;                % optimal velocity parameter
 len = 60;               % length of the ring road
 numCars = 60;           % number of cars
-
-tskip = 500;            % times for evolving
-delta = 500;
+alignTo = 20;
+tskip = 300;            % times for evolving
+delta = 2000;
 
 stepSize = .0001;        % step size for the secant line approximation
-delSigma = 0.00001;     % delta sigma used for finite difference of F
-delv0 = 0.00001;        % delta v0 used for finite difference of F
-tolerance = 10^(-9);    % tolerance for Newton's method
+delSigma = 10^(-7);     % delta sigma used for finite difference of F
+delv0 = 10^(-7);        % delta v0 used for finite difference of F
+tolerance = 10^(-14);    % tolerance for Newton's method
 
-options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
-foptions = optimset('TolFun',tolerance);              % fsolve options
+options = odeset('AbsTol',10^-8,'RelTol',10^-8);                                % ODE 45 options
+foptions = optimoptions(@fsolve, 'TolFun', tolerance, 'display', 'off');      	%fsolve options
 
 %% load diffusion map data
-load('jacobOutput','joutput885');
-load('jacobOutput2','j2output885');
-load('jacobOutput3', 'j3output885');
-load('jacobOutput7', 'j7output885');
-loadedData = [joutput885 j2output885 j3output885 j7output885];
-load('repsaves','trafficOutput2');
-loadedData = [loadedData trafficOutput2];
-
-allData = getHeadways(loadedData(1:numCars, :));        % headway data for the diffusion map
-
-%% align the maximum of each wave at the last position
-allData = shiftMax(allData,30);                         % initially move the max to 30 to avoid indexing errors
-for iFun = 1:size(allData,2)                            % max headway will always be at 60
-    allData(:,iFun) = alignMax(allData(:,iFun),30);
-end
+load('moreData.mat', 'betterData');
+allData = betterData;                                   % aligned headway data
 
 numEigvecs = 1;                                         % number of eigenvectors to return
 [evecs, evals, eps] = runDiffMap(allData,numEigvecs);   % run the diffusion map
 
-% plot sigma vs eigenvector 1
-figure;
-scatter(std(allData), evecs,'b.');
-xlabel('\sigma');
-ylabel('\Phi_1');
+[evecs,ia,~] = unique(evecs);
+allData = allData(:, ia);
 
-format long;
-% testval = -.002275;
-% testlift = diffMapLift(testval,evecs,evals,eps,allData);
-% 
-% afterEvolve = ler(testval,allData,tskip,.884,evecs,evals,eps)
+%{
+% calculate how unique each eigen direction is
+r = zeros(numEigvecs, 1);
+r(1) = 1;
+for j = 2:numEigvecs
+    disp(j);
+    r(j) = linearFit(evecs,j);
+end
+%}
 
 %% initialize secant continuation
-steps = 50;                                % number of steps to take around the curve
+steps = 400;                                % number of steps to take around the curve
 bif = zeros(2,steps);                       % array to hold the bifurcation values
 
 % initialize the first reference state
-load('save884','trafficOutput','v0');
-ref_2 = getHeadways(trafficOutput(1:60));
-ref_2 = alignMax(ref_2,30);
-v0_base2 = v0;
+load('start0.884800.mat', 'trafficData', 'vel');
+ref_2 = getHeadways(trafficData(1:numCars), len);
+ref_2 = alignMax(ref_2, alignTo, false);
+v0_base2 = vel;
 
 % initialize the second reference state
-load('885ref','trafficOutput','v0');
-ref_1 = getHeadways(trafficOutput(1:60));
-ref_1 = alignMax(ref_1,30);
-v0_base1 = v0;
+load('start0.885000.mat', 'trafficData', 'vel');
+ref_1 = getHeadways(trafficData(1:numCars), len);
+ref_1 = alignMax(ref_1, alignTo, false);
+v0_base1 = vel;
 
-sigma_1 = diffMapRestrict(ref_1,evals,evecs,allData,eps)      %initial sigma values for secant line approximation
-sigma_2 = diffMapRestrict(ref_2,evals,evecs,allData,eps)
+sigma_1 = diffMapRestrict(ref_1,evals,evecs,allData,eps);      %initial sigma values for secant line approximation
+sigma_2 = diffMapRestrict(ref_2,evals,evecs,allData,eps);
 
-stdevs = [std(ref_1) std(ref_2)]
-
+%% pseudo arc length continuation
 figure;
 hold on;
-%% pseudo arc length continuation
 for iEq=1:steps
     fprintf('Starting iteration %d of %d \n', iEq, steps);
     w = [sigma_2 - sigma_1 ; v0_base2 - v0_base1];          % slope of the secant line
     newGuess = [sigma_2; v0_base2] + stepSize *(w/norm(w)); % first guess on the secant line
-    
-    %% initialize Newton's method
-    u = newGuess;
-    first = true;                       % mimic a do-while loop
-    k=1;                            	% Newton's method counter
-    
-    %% Newton and that other guy's method
-    while(first || norm([f neww]) > tolerance && k < 20)
-        first = false;
-        fprintf('\t Step %i \t Newton iteration: %d \n', iEq, k);
-        f = F(allData, u(1),u(2), evecs, evals, eps);                                % calculcate the function to zero
-        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
-        Df = jacobian(allData, u(1), u(2), w, evecs, evals, eps);                    % find the jacobian
-        invD = Df^(-1);
-        u = u - invD*[f;neww];                                  % perform the Newton step
-        k = k + 1;
-        fprintf('new v0 = %d \n',u(2));
-        fprintf('f value was %d \n', f);
-    end
-    
-    %% alternate Newton's method using fsolve
-    %u = fsolve(@(u)FW(u,allData,w,newGuess,evecs,evals,eps), newGuess,foptions)
-    
-    bif(:,iEq) = u;                                            % save the new solution
-    
-    scatter(u(2),u(1),200,'b.');
-    drawnow;
+
+    %% Newton's method using fsolve
+    u = fsolve(@(u)FW(u,allData,w,newGuess,evecs,evals,eps), newGuess,foptions);
+    fprintf('\t Velocity is: %f \n', u(2));
+    sig = interp1(evecs,std(allData(1:numCars,:)),u(1));        % interpolate to sigma
+    scatter(u(2), sig, 'b*'); drawnow;                          % plot the bifurcation diagram as it grows
     
     %% reset the values for the arc length continuation
     sigma_1 = sigma_2;
     v0_base1 = v0_base2;
     v0_base2 = u(2);
-    [sigma_2,~] = ler(u(1),allData,tskip+delta,u(2),evecs,evals,eps);                     % find the new reference state
+    sigma_2 = u(1);                                             % find the new reference state
+    bif(:,iEq) = [sigma_2 ; v0_base2];                          % save the new solution
 end
-
 hold off;
+
+% plot sigma vs eigenvector 1
+figure;
+scatter(std(allData(1:numCars, :)), evecs(:,1),'b.');
+xlabel('\sigma');
+ylabel('Steve');
 
 %% plot the bifurcation diagram
 figure;
@@ -118,13 +89,13 @@ xlabel('v0');
 ylabel('\Phi_1');
 
 % interpolate back to the standard deviation values
-sig = interp1(evecs,std(allData),bif(1,:));
+sig = interp1(evecs,std(allData(1:numCars,:)),bif(1,:));
 % plot the bifurcation diagram using standard deviation coordinates
 figure;
 scatter(bif(2,:),sig);
-title('interpolated sigmas');
+title('Interpolated sigmas');
 xlabel('v0');
-ylabel('\Phi_1');
+ylabel('\sigma');
 
 %% functions
 
@@ -138,10 +109,13 @@ ylabel('\Phi_1');
 %
 % RETURNS:
 % fw    - the functions F and w evaluated at these parameters
-    function fw = FW(u,ref,W,newGuess,evecs,evals,lereps)
+    function [fw, J] = FW(u,ref,W,newGuess,evecs,evals,lereps)
         fw = zeros(2,1);
         fw(1) = F(ref,u(1),u(2),evecs,evals,lereps);
         fw(2) = W(1)*(u(1)-newGuess(1)) + W(2)*(u(2) - newGuess(2));
+        if(nargout >1)
+            J = jacobian(ref, u(1), u(2),W,evecs,evals,lereps);
+        end
     end
 
 %% lift, evolve, restrict
@@ -156,37 +130,18 @@ ylabel('\Phi_1');
 % new_state - the final state of the evolution, which can be used as a
 %               future reference state
     function [sigma,new_state, sigma2, new_state2] = ler(newval,orig,t,v0,eigvecs,eigvals,lereps,tReference)
-        liftedHways = diffMapLift(newval, eigvecs,eigvals,lereps, orig);
-        liftedPosns = cumsum(liftedHways);
-        liftedVel = optimalVelocity(liftedHways,v0);
-        lifted = [liftedPosns ; liftedVel];
-        [tevo,evo] = ode45(@microsystem,[0 t],lifted, options,v0);
-        evohways = zeros(numCars,size(evo,1));
-        
-%         evosteve = zeros(size(evo,1),1);
-%         evonsteve = zeros(size(evo,1),1);
-%         for iSteve = 1:length(evosteve)
-%             iSteve
-%             evohways(:,iSteve) = alignMax(getHeadways(evo(iSteve,1:60)'),30);
-%             [evosteve(iSteve),evonsteve(iSteve)] = diffMapRestrict(evohways(:,iSteve),eigvals,eigvecs,orig,eps);
-%         end
-%         
-%         figure;
-%         plot(tevo,evosteve);
-%         title('Steve over time');
-%         
-%         figure;
-%         plot(tevo,evonsteve);
-%         title('Nystrom Steve over time');
-        
+        lifted = smartLift(newval, eigvecs, eigvals, lereps,v0, orig, alignTo, h, len);
+        [~,evo] = ode45(@microsystem,[0 t],lifted, options,[v0 len h]);
         if (nargin > 7)
-            [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
-            evo2Cars = evo2(end, 1:numCars)';
-            evo2Cars = alignMax(getHeadways(evo2Cars),30);
+            [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,[v0 len h]);
+            evo2Cars = evo2(end, :)';
+            evo2Cars = getHeadways(evo2Cars(1:numCars), len); 
+            evo2Cars = alignMax(evo2Cars, alignTo, false);
             sigma2 = diffMapRestrict(evo2Cars,eigvals,eigvecs, orig, lereps);
         end
-        evoCars = evo(end, 1:numCars)';
-        evoCars = alignMax(getHeadways(evoCars),30);
+        evoCars = evo(end, :)';
+        evoCars = getHeadways(evoCars(1:numCars), len);
+        evoCars = alignMax(evoCars, alignTo, false);
         sigma = diffMapRestrict(evoCars, eigvals, eigvecs, orig, lereps);
         if(nargout >= 2)
             new_state = evo(end,1:2*numCars)';
@@ -222,98 +177,6 @@ ylabel('\Phi_1');
         J(1,1) = (F(ref, sigma + delSigma, v0,eigvecs,eigvals,lereps) - unchanged)/delSigma;
         J(1,2) = (F(ref, sigma,v0 + delv0,eigvecs,eigvals,lereps) - unchanged)/delv0;
         J(2,:) = w';
-    end
-
-%% lifting operator
-% s 	-   the target std. for this state
-% p     -   parameter which will degrade the accuracy of the lifting
-%           operator.  Should be kept at p = 1 by default.
-% hways -   headways of the cars at a reference state
-% v0    -   the goal velocity at this state
-% RETURNS:
-% new   -   the lifted vector of cars and their positions. The cars
-%           will be reset to new positions with the first car centered
-%            at 0, and with headways that will give the desired std. of
-%            s.  The cars' new velocities will be given directly by the
-%            optimal velocity function.
-    function new = lift(s, p, hways, v0)
-        del = p * s/std(hways) * (hways - mean(hways)) + mean(hways);
-        new = zeros(length(hways)*2,1);
-        for iLift=2:length(hways)
-            new(iLift) = mod(sum(del(1:iLift-1)),len);
-        end
-        hways = getHeadways(new(1:length(hways)));
-        for iLift=1:length(hways)
-            new(iLift+length(hways)) = optimalVelocity(hways(iLift), v0);
-        end
-    end
-
-%% optimal velocity function given in paper
-%    h         -  a parameter to represent the optimal velocity of the
-%               	car
-%    headway   - the distance between this car and the car ahead of it
-%    v0        - ideal goal speed of each driver
-%    returns:
-%    v         - the optimal velocity of this car, who will speed or slow to try
-%                   to meet it
-    function v = optimalVelocity(headway,v0)
-        v = v0 * (tanh(headway - h) + tanh(h));
-    end
-
-%% function to calculate headways of car vector
-%  v   - column vector of the cars' positions
-%  returns:
-%  hways - column vector of cars' headways
-    function hways = getHeadways(v)
-        futureCars = circshift(v,[-1,0]);
-        hways = mod(futureCars - v, len);
-    end
-
-%% function to circshift max to beginning
-    function c = shiftMax(hways, center)
-        if(nargin>1)
-            shift = center + 1;
-        else
-            shift = 1;
-        end
-        [~, maxH] = max(hways,[],1);  % locate the max headway for each data point
-        c = zeros(size(hways));
-        
-        % align all of the headways with the max in the front
-        for iCar = 1:length(maxH)
-            c(:,iCar) = circshift(hways(:,iCar), [-maxH(iCar)+shift,0]);
-        end
-    end
-
-%% ODE that governs individual cars
-% Governs the movement of the individual cars (microvariables)
-% ~         - dummy parameter for time, to allow use in ode45
-% params    - a column vector of the distribution of the cars and their
-%               velocities, of size 2*numCars.  The position of car i
-%               and its velocity are given at num params(i),
-%               params(i + numcars)
-%
-    function u = microsystem(~,colCars, v0)
-        invT = 1.7;
-        headways = getHeadways(colCars(1:numCars));
-        
-        u = zeros(2*numCars,1);
-        u(1:numCars,1) = colCars(numCars+1:2*numCars,1);
-        u(numCars+1:2*numCars,1) = invT*(optimalVelocity(headways,v0) - colCars(numCars+1:2*numCars,1));
-    end
-
-%% get the values and indices surrounding the maximum of each profile
-% hways - the profile
-%
-% returns:
-%       maxinds - the 3 indices around/including the maximum
-%       maxvals - the 3 values around/including the maximum
-    function [maxinds, maxvals] = getTop3(hways)
-        [maxhw,maxind] = max(hways,[],1);                   % find index and value of maximum
-        ind1 = mod(maxind-2,numCars)+1;                     % find point to the left
-        ind3 = mod(maxind,numCars)+1;                       % point to the right
-        maxinds = [ind1 ; maxind ; ind3];                   % all of the indices together
-        maxvals = [hways(ind1) ; maxhw ; hways(ind3)];      % values at the indices
     end
 
 end

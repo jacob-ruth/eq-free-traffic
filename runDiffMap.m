@@ -16,8 +16,7 @@ allTime = data;
 
 % calcuate the pairwise distances between data points
 D = squareform(pdist(allTime'));
-
-eps = median(D(:))/3; % choose epsilon for the kernel based on the pairwise distances
+eps = 5*median(D(:)); % choose epsilon for the kernel based on the pairwise distances
 
 [vec,val] = diffusionMap(eps,D,k);          % calculate the diffusion map
 
@@ -35,9 +34,7 @@ end
     % distances - the pairwise distances between data points
     function plotEps(distances)
         % create the values of epsilon to test from 0 to maxEps by stepSize
-        stepSize = .0001;
-        maxEps = 1;
-        epsilon = 0:stepSize:maxEps;
+        epsilon = logspace(-3,2,1000);
         % count the number of points that are less than each epsilon
         L = zeros(size(epsilon));
         for iEps = 1:length(epsilon)
