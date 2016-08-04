@@ -5,10 +5,10 @@ function trafficBifurcation()
     mu = .1;                % initial position parameter
     finalTime = 200000;     % reference state final time
     
-    tskip = 300;            % times for evolving
+    tskip = 600;            % times for evolving
     delta = 2000;           
     
-    stepSize = .001;        % step size for the secant line approximation
+    stepSize = .0025;        % step size for the secant line approximation
     delSigma = 0.00001;     % delta sigma used for finite difference of F
     delv0 = 0.00001;        % delta v0 used for finite difference of F
     tolerance = 10^(-7);    % tolerance for Newton's method
@@ -42,9 +42,9 @@ function trafficBifurcation()
     load('refStats919.mat','ref_1','ref_2');  
     
     %% initialize secant continuation
-    steps = 200;                                % number of steps to take around the curve
+    steps = 10;                                % number of steps to take around the curve
     bif = zeros(2,steps);                       % array to hold the bifurcation values
-    
+    actuals = zeros(2,steps);
     sigma_1 = std(getHeadways(ref_1(1:numCars)));      %initial sigma values for secant line approximation
     sigma_2 = std(getHeadways(ref_2(1:numCars)));
     
@@ -58,7 +58,7 @@ function trafficBifurcation()
         u = newGuess;
         first = true;                       % mimic a do-while loop                                
         k=1;                            	% Newton's method counter
-        
+        figure;
         %% Newton and that other guy's method
         while(first ||(norm(invD*[f;neww])>tolerance && k < 20))
             first = false;
@@ -82,12 +82,14 @@ function trafficBifurcation()
         v0_base1 = v0_base2;
         v0_base2 = u(2);
         [sigma_2,ref_2] = ler(u(1),ref_1,tskip+delta,1,u(2));       % find the new reference state
+        actuals(:,iEq) = [sigma_2 u(2)];
     end
 
     %% plot the bifurcation diagram
     figure;
+    hold on;
     scatter(bif(2,:),bif(1,:),'*');
-    
+    scatter(actuals(2,:),actuals(1,:),'o');
     %save('eqFreeBif.mat','bif');
     
     %% functions
@@ -121,9 +123,24 @@ function trafficBifurcation()
     %               future reference state
     function [sigma,new_state, sigma2, new_state2] = ler(sigma,ref,t,p,v0, tReference)
         lifted = lift(sigma, p, getHeadways(ref(1:numCars)),v0);
-         [~,evo] = ode45(@microsystem,[0 t],lifted, options,v0);
+         [t1,evo] = ode45(@microsystem,[0 t],lifted, options,v0);
          if (nargin > 5)
-             [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
+             [t2,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
+             
+            allTimePoints = linspace(0,t, (t)/10);
+            allTimePoints2 = linspace(t,tReference + t, (tReference)/10);
+            evoPoints = interp1(t1, evo, allTimePoints);
+            evoPoints2 = interp1(t2 + t, evo2, allTimePoints2);
+            evoHways = getHeadways(evoPoints(:,1:numCars)');
+            evoHways2 = getHeadways(evoPoints2(:,1:numCars)');
+            evosteve = std(evoHways);
+            evosteve2 = std(evoHways2);
+            clf;
+            hold on;
+            scatter(allTimePoints, evosteve, 'b.');
+            scatter(allTimePoints2, evosteve2, 'r.');
+            hold off;
+            drawnow;
              sigma2 = std(getHeadways(evo2(end,1:numCars)'));
          end
          evoCars = evo(end, 1:numCars)';

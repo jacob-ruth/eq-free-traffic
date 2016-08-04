@@ -2,14 +2,20 @@
 % builds a diffusion map, compares the eigen directions given by the
 % diffusion map eigenvectors, and plots relevent eigenvectors scaled by
 % corresponding eigenvalues
-function [vec,val,eps] = runDiffMap(data,k, weight)
+function [vec,val,eps] = runDiffMap(data,k)
 
 % build the data from the simulation results
 allTime = data; % data should be passed in as headwaysD
 
 % calcuate the pairwise distances between data points
-D = squareform(pdist(allTime'));
-eps = weight*median(D(:)); % choose epsilon for the kernel based on the pairwise distances
+D = zeros(length(allTime));
+for r = 1:length(allTime)
+    for c = 1:length(allTime)
+        D(r,c) = norm(allTime(:,r)-allTime(:,c));
+    end
+end
+
+eps = median(D(:))*5; % choose epsilon for the kernel based on the pairwise distances
 
 [vec,val] = diffusionMap(eps,D,k);          % calculate the diffusion map
 
@@ -25,7 +31,9 @@ end
     % less than epsilon vs. epsilon
     function plotEps(distances)
         % create the values of epsilon to test from 0 to maxEps by stepSize
-        epsilon = logspace(-3,2,1000);
+        stepSize = .0001;
+        maxEps = 1;
+        epsilon = 0:stepSize:maxEps;
         % count the number of points that are less than each epsilon
         L = zeros(size(epsilon));
         for iEps = 1:length(epsilon)

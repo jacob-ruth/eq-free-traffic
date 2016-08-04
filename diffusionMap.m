@@ -14,11 +14,7 @@ function [vec,val] = diffusionMap(epsilon,distMatrix,k)
     
     %return first k eigenvalues/vectors
     val = seval(2:end,2:end);
-    vec = sevec(:,2:end);
-    
-    %undo = diag(sum(A,2).^-.5);
-    %vec = undo * vec;
-    
+    vec = sevec(:,2:end);    
     % create a Markov matrix
     function M = markovify(af)
         M = zeros(size(af));

@@ -77,6 +77,7 @@ for iMic = 1:steps
     sys2 = u;
 end
 
+%save('microBif.mat', 'bif');
 %% plot results
 figure;
 scatter(bif(end,:), std(bif(1:numCars,:)),50,'b.');
