@@ -40,7 +40,7 @@ iterCount = 0;
 while(iterCount == 0 || (norm(val - newVal) > 1e-9 && iterCount < 20))
     lWeight = 0.5;                                                          % weight given to lower profile
     guessState = lowerPreDrop * lWeight + higherPreDrop * (1 - lWeight);    % linear combination of upper and lower
-    guessPosns = cumsum(guessState);                                        % find positions 
+    guessPosns = hwayToPos(guessState);                                        % find positions 
     guessPrevo = [guessPosns ; optimalVelocity(h, guessState, v0)];         % inital state for ODE45
     [gtevo,gevo] = ode45(@microsystem,[0 10],guessPrevo, options,[v0 len h]);   % evolve the guess
     guessEvolved = getHeadways(gevo(end, 1:numCars)', len);                     
@@ -72,7 +72,7 @@ l = gevo(end, :);                 % return the evolved profile
         if(nargout == 3)
             preDrop = neighbor;     
         end
-        liftedPosns = cumsum(neighbor);                 % find the positions
+        liftedPosns = hwayToPos(neighbor);                 % find the positions
         liftedGuess = [liftedPosns ; optimalVelocity(h, neighbor, v0)];     % initial state for ODE45
         [~,evo] = ode45(@microsystem,[0 10],liftedGuess, options,[v0 len h]);   % evolve the profile
         evolvedHways = getHeadways(evo(end, 1:numCars)', len);  
