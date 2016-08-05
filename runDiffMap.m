@@ -14,11 +14,11 @@ eps = weight*median(D(:)); % choose epsilon for the kernel based on the pairwise
 [vec,val] = diffusionMap(eps,D,k);          % calculate the diffusion map
 
 % calculate how unique each eigen direction is
-r = zeros(k, 1);
-r(1) = 1;
-for j = 2:k
-    r(j) = linearFit(vec,j);
-end
+% r = zeros(k, 1);
+% r(1) = 1;
+% for j = 2:k
+%     r(j) = linearFit(vec,j);
+% end
 
 
     % plotEps creates a log-log plot of the number of data points that are
