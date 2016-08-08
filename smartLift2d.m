@@ -7,75 +7,94 @@ numCars = 60;           % number of cars
 newVal = reshape(newVal, 1, length(newVal));        % newVal is a row vector
 evoTime = 10;
 
-tolerance = 1e-9;
+tolerance = 1e-8;
 
-distmult = 3;
-
-foptions = optimset('TolFun',1e-10, 'ObjectiveLimit', 1e-6, 'Display', 'iter','Jacobian','on'); % fsolve options
+distmult = 2;
 
 difs = evec - repmat(newVal,size(evec,1),1);
 allDists = sqrt(diag(difs * difs'));
-[closestdist, closeidx] = min(allDists);
-[closestprof,closestvals] = evolveRestrict([cumsum(oldData(:,closeidx)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx)),len),v0)]);
+[allDists,sortidx] = sort(allDists);
 
-displacement = newVal - closestvals;    %vector from target to close (hopefully) point
-
-pts = zeros(2,2);
-perp = [-displacement(2) displacement(1)];
-pts(1,:) = newVal + distmult*displacement - perp;
-pts(2,:) = newVal + distmult*displacement + perp;
-
-difs1 = evec - repmat(pts(1,:),size(evec,1),1);
-allDists1 = sqrt(diag(difs1 * difs1'));
-[closestdist1, closeidx1] = min(allDists1);
-[closestprof1,closestvals1] = evolveRestrict([cumsum(oldData(:,closeidx1)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx1)),len),v0)]);
-
-difs2 = evec - repmat(pts(2,:),size(evec,1),1);
-allDists2 = sqrt(diag(difs2 * difs2'));
-[closestdist2, closeidx2] = min(allDists2);
-[closestprof2,closestvals2] = evolveRestrict([cumsum(oldData(:,closeidx2)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx2)),len),v0)]);
-
-triangle = zeros(2*numCars,3);                   % points (profiles) of triangle in columns
-triangle(:,1) = closestprof;
-triangle(:,2) = closestprof1;
-triangle(:,3) = closestprof2;
-
-vals = [closestvals ; closestvals1 ; closestvals2];     % Leslie-Ann pairs (in rows) surrounding newVal
+itri = 1;
+while(itri == 1 || ~PointInTriangle(newVal,vals))
+    closeidx = sortidx(itri);
+    closestdist = allDists(itri);
+    [closestprof,closestvals] = evolveRestrict([cumsum(oldData(:,closeidx)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx)),len),v0)]);
+    
+    displacement = newVal - closestvals;    %vector from target to close (hopefully) point
+    
+    pts = zeros(2,2);
+    perp = [-displacement(2) displacement(1)];
+    pts(1,:) = newVal + distmult*displacement - perp;
+    pts(2,:) = newVal + distmult*displacement + perp;
+    
+    difs1 = evec - repmat(pts(1,:),size(evec,1),1);
+    allDists1 = sqrt(diag(difs1 * difs1'));
+    [closestdist1, closeidx1] = min(allDists1);
+    [closestprof1,closestvals1] = evolveRestrict([cumsum(oldData(:,closeidx1)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx1)),len),v0)]);
+    
+    difs2 = evec - repmat(pts(2,:),size(evec,1),1);
+    allDists2 = sqrt(diag(difs2 * difs2'));
+    [allDists2,distidxs] = sort(allDists2);
+    [closestdist2, closeidx2] = min(allDists2);
+    [closestprof2,closestvals2] = evolveRestrict([cumsum(oldData(:,closeidx2)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx2)),len),v0)]);
+    
+    triangle = zeros(2*numCars,3);                   % points (profiles) of triangle in columns
+    triangle(:,1) = closestprof;
+    triangle(:,2) = closestprof1;
+    triangle(:,3) = closestprof2;
+    
+    vals = [closestvals ; closestvals1 ; closestvals2];     % Leslie-Ann pairs (in rows) surrounding newVal
+    
+%     clf;
+%     hold on;
+%     scatter(vals(:,1),vals(:,2),'b*');
+%     scatter(newVal(1),newVal(2),'r*');
+%     hold off;
+%     pause;
+    
+    itri = itri+1;
+end
 
 first = true;
 done = false;
 iter = 1;
 tic;
-figure;
-while((first || ~done) && iter <= 200)
+while((first || ~done) && iter <= 500)
     iter = iter + 1;
     dists = [closestdist closestdist1 closestdist2];
 % %     weights = (1/(2*sum(dists)))*(ones(length(dists),1)*sum(dists) - dists');
 %     weights = ones(length(dists),1)/length(dists);
 %     newprof = triangle*weights;
 %     [dropprof, newpoint] = evolveRestrict(newprof);
+
     % find longest side length
     sides = squareform(pdist(vals));
     [~, location] = max(sides(:));
     [i,j] = ind2sub(size(sides),location);
+
     % split longest side
-    newprof = (triangle(:,i) + triangle(:,j))/2;
+    weight = .45 + rand()*.1;
+    newprof = weight*triangle(:,i) + (1-weight)*triangle(:,j);
     [dropprof, newpoint] = evolveRestrict(newprof);
    
-    clf;
-    hold on;
-    scatter(vals(:,1),vals(:,2),'b*');
-    scatter(newpoint(1),newpoint(2),'c*');
-    scatter(newVal(1),newVal(2),'r*');
-    hold off;
-    pause;
+%     clf;
+%     hold on;
+%     scatter(vals(:,1),vals(:,2),'b*');
+%     scatter(newpoint(1),newpoint(2),'c*');
+%     scatter(newVal(1),newVal(2),'r*');
+%     if(~first)
+%         scatter(oldVal(1),oldVal(2),'ko');
+%     end
+%     drawnow;
+%     hold off;
     
     if(norm(newpoint - newVal) < tolerance)
         done = true;
         lifted = dropprof;
-    elseif(~first && norm(oldVal - newpoint) < 1e-15)
-        done = true;
-        lifted = lineartriangle(vals,triangle);
+%     elseif(~first && norm(oldVal - newpoint) < 1e-15)
+%         done = true;
+%         lifted = lineartriangle(vals,triangle);
     else
         if(PointInTriangle(newVal,[vals([1 2],:) ; newpoint]))
             triangle = [triangle(:,1:2), newprof];
@@ -107,13 +126,13 @@ toc;
             [guessEvolved,val] = evolveRestrict(guessPrevo);
             iterCount = iterCount + 1
             
-%             clf;
-%             hold on;
-%             scatter(newVal(1),newVal(2),300,'r.');
-%             scatter([lowpt(1),highpt(1)],[lowpt(2),highpt(2)],300,'b.');
-%             scatter(val(1),val(2),'k*');
-%             hold off;
-%             pause;
+            clf;
+            hold on;
+            scatter(newVal(1),newVal(2),300,'r.');
+            scatter([lowpt(1),highpt(1)],[lowpt(2),highpt(2)],300,'b.');
+            scatter(val(1),val(2),'k*');
+            hold off;
+            pause;
             
             % reset the uppper or lower limit
             [lowpt,lowerPreDrop,highpt,higherPreDrop] =...
@@ -150,31 +169,9 @@ toc;
 
 % cars - 2*numCars vector of positions (NOT HEADWAYS) and velocities
     function [l, val] = evolveRestrict(cars)
-        hways = getHeadways(cars(1:numCars), len);
-        start = diffMapRestrict(hways, eval, evec, oldData, eps);     % find the starting coordinate
-        xDist = start(1) - center(1);
-        yDist = start(2) - center(2);
-        startAngle = atan2(yDist,xDist);                                % find the angle to match
-        currentAngle = 10000;
-        
-        eventFunction = @(t,prof)loopEvent(t,prof,startAngle);
-        
-        options.events = eventFunction;
-        
-        [~,evolved] = ode45(@microsystem,[0 .5],cars,options,[v0 len h]);
-%         while(abs(currentAngle - startAngle) > 0.05)                    % evolve until we're back at the starting angle
-%             [~,evolved] = ode45(@microsystem,[0 .5],cars,options,[v0 len h]);
-%             hways = getHeadways(evolved(end,1:numCars)', len);
-%             restricted = diffMapRestrict(hways, eval, evec, oldData, eps);
-%             xD = restricted(1) - center(1);
-%             yD = restricted(2) - center(2);
-%             currentAngle = atan2(yD,xD);
-%             cars = evolved(end, :)';
-%         end
-        cars = evolved(end,:)';
-        restricted = diffMapRestrict(getHeadways(evolved(end,1:numCars)',len),...
-            eval, evec, oldData, eps);
-        l = cars;
+        l = findPeriodic(cars,eval,evec,oldData,eps,v0);
+        restricted = diffMapRestrict(getHeadways(l(1:numCars),len),...
+            eval,evec,oldData,eps);
         val = restricted';
     end
 

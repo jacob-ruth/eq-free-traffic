@@ -2,6 +2,7 @@ function looped = findPeriodic(cars, eval, evec, oldData, eps, v0)
 len = 60;
 numCars = length(cars)/2;
 h = 1.2;
+minLoopTime = 60;
 
 hways1 = getHeadways(cars(1:numCars), len);
 startRestrict = diffMapRestrict(hways1, eval, evec, oldData, eps);     % find the starting coordinate
@@ -12,7 +13,8 @@ eventFunction = @(t,prof)loopEvent(t,prof, [tangentLine startRestrict]);
 opts = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
 opts = odeset(opts,'Events',eventFunction);
 
-[~,evolve] = ode45(@(t,y)microsystem(t,y,[v0 len h]), [0 100], cars, opts);
+[~,evolve,te] = ode45(@(t,y)microsystem(t,y,[v0 len h]), [0 1000], cars, opts);
+
 looped = evolve(end, :)';
 
 
@@ -26,16 +28,20 @@ looped = evolve(end, :)';
         diff = start - final;
     end
 
-    function [dif,isTerminal,direction] = loopEvent(~,prof, param)
+    function [dif,isTerminal,direction] = loopEvent(t,prof, param)
         tan = param(:,1);
         start = param(:,2);
         
-        isTerminal = 1;
+        if(t > minLoopTime)
+            isTerminal = 1;
+            hways = getHeadways(prof(1:numCars), len);
+            restricted = diffMapRestrict(hways, eval, evec, oldData, eps);
+            current = restricted - start;
+            dif = dot(current, tan);
+        else
+            isTerminal = 0;
+            dif = .1;
+        end
         direction = -1;
-        
-        hways = getHeadways(prof(1:numCars), len);
-        restricted = diffMapRestrict(hways, eval, evec, oldData, eps);
-        current = restricted - start;
-        dif = dot(current, tan);
     end
 end
