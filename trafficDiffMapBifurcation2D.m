@@ -4,122 +4,90 @@ len = 60;               % length of the ring road
 numCars = 60;           % number of cars
 tskip = 300;            % times for evolving
 delta = 500;
-stepSize = .0001;        % step size for the secant line approximation
+stepSize = .001;        % step size for the secant line approximation
 delSigma = 0.00001;     % delta sigma used for finite difference of F
 delv0 = 0.00001;        % delta v0 used for finite difference of F
-tolerance = 10^(-5);    % tolerance for Newton's method
-
-center = [0 0];
-
+tolerance = 10^(-9);    % tolerance for Newton's method
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
-foptions = optimset('TolFun',1e-8);              % fsolve options
+foptions = optimset('TolFun',tolerance);              % fsolve options
 
 %% load diffusion map data
-% load('jacobOutput','joutput885');
-% load('jacobOutput2','j2output885');
-% load('jacobOutput3', 'j3output885');
-% load('jacobOutput7', 'j7output885');
-% load('saveData','trafficOutput');
-% loadedData = [joutput885 j2output885 j3output885 j7output885 trafficOutput];
-% load('885low','trafficOutput');
-% loadedData = [loadedData trafficOutput];
-% 
-% allData = getHeadways(loadedData(1:numCars, :),len);        % headway data for the diffusion map
-
-load('bigData.mat', 'trafficOutput2');
-allData = getHeadways(trafficOutput2(1:numCars, :), len);
-numEigvecs = 2;                                         % number of eigenvectors to return
-tic;
-[evecs, evals, eps] = runDiffMap(allData,numEigvecs,7);   % run the diffusion map
-toc;
-
-figure;
-hold on;
-scatter(evecs(:,1),evecs(:,2),200,'b.');
-drawnow;
-curpt = [.01 0];
-for iTraj = 1:100
-    scatter(curpt(1),curpt(2),'r*');
-    drawnow;
-    curpt = ler(curpt,allData,40,.885,evecs,evals,eps);
-end
-hold off;
-
 %{
+load('bigData.mat', 'trafficOutput2');
+ allData = getHeadways(trafficOutput2(1:numCars, :), len);
+numEigvecs = 2;                                         % number of eigenvectors to return
+[evecs, evals, eps] = runDiffMap(allData,numEigvecs);   % run the diffusion map
+%}
+load('bigDataMap.mat', 'evecs', 'evals', 'eps', 'allData');
+[evecs,ia,~] = unique(evecs, 'rows');
+allData = allData(:, ia);
 % calculate which eigenvectors are most significant
+%{
 r = zeros(numEigvecs, 1);
 r(1) = 1;
 for j = 2:numEigvecs
     r(j) = linearFit(evecs,j);
 end
-r
-
-
+%}
+%{
+[~, max1] = max(allData,[],1);  % locate the max headway for each data point
 % plot eigenvector 1 vs eigenvector 2, colored by max headway location
 figure;
-scatter(evecs(:,1), evecs(:,2), 10, max1);
-colorbar;
-xlabel('\Phi_1');
-ylabel('\Phi_2');
-title('Colored by max');
+scatter(evecs(:,1), evecs(:,2), 100, max1,'.');
+h = colorbar;
+xlabel(h, 'Wave Position', 'fontsize', 15)
+colormap(jet);
+xlabel('\Phi_1', 'FontSize',15);
+ylabel('\Phi_2', 'FontSize',15);
+title('\Phi_1 vs. \Phi_2 Colored by Locations of the Max Headways','FontSize',15);
 
 % plot eigenvector 1 vs eigenvector 2, colored by standard deviation
 figure;
-scatter(evecs(:,1), evecs(:,2), 10, std(allData));
+scatter(evecs(:,1), evecs(:,2), 100,  std(allData),'.');
 colorbar;
-xlabel('\Phi_1');
-ylabel('\Phi_2');
-title('Colored by standard deviation');
+h = colorbar;
+xlabel(h, '\sigma', 'fontsize', 15)
+colormap(jet);
+xlabel('\Phi_1', 'FontSize',15);
+ylabel('\Phi_2', 'FontSize',15);
+title('\Phi_1 vs. \Phi_2 Colored by Standard Deviation of the Headways','FontSize',15);
 %}
 
-
-
-
 %% initialize secant continuation
-steps = 50;                                % number of steps to take around the curve
+steps = 20;                                % number of steps to take around the curve
 bif = zeros(3,steps);                       % array to hold the bifurcation values
 
 % initialize the first reference state
-load('save884','trafficOutput','v0');
-ref_2 = getHeadways(trafficOutput(1:60));
-v0_base2 = v0;
+load('start0.884800.mat', 'trafficData', 'vel');
+[trafficOutput, tang] = findPeriodic(trafficData, evals, evecs, allData, eps, vel);
+ref_2 = getHeadways(trafficOutput(1:60), len);
+v0_base2 = vel;
+embed_2 = diffMapRestrict(ref_2,evals,evecs,allData,eps);
+start = embed_2;
 
 % initialize the second reference state
-load('885ref','trafficOutput','v0');
-ref_1 = getHeadways(trafficOutput(1:60));
-v0_base1 = v0;
-
+load('start0.885000.mat', 'trafficData', 'vel');
+looped = findPeriodic(trafficData, evals, evecs, allData, eps, vel, tang, start);
+ref_1 = getHeadways(looped(1:60), len);
+v0_base1 = vel;
 embed_1 = diffMapRestrict(ref_1,evals,evecs,allData,eps);      %initial sigma values for secant line approximation
-embed_2 = diffMapRestrict(ref_2,evals,evecs,allData,eps);
+
+figure; hold on;
+scatter(evecs(:,1), evecs(:,2), 'c.');
+scatter(embed_1(1), embed_1(2), 'b*');
+scatter(embed_2(1), embed_2(2), 'ro');
 
 %% pseudo arc length continuation
 for iEq=1:steps
     fprintf('Starting iteration %d of %d \n', iEq, steps);
     w = [embed_2 - embed_1 ; v0_base2 - v0_base1];          % slope of the secant line
-    newGuess = [embed_2; v0_base2] + stepSize *(w/norm(w)); % first guess on the secant line
-    
-    %% initialize Newton's method
-    u = newGuess;
-    first = true;                       % mimic a do-while loop
-    k=1;                            	% Newton's method counter
-    
-    %% Newton and that other guy's method
-    while(first ||(norm(invD*[f;neww])>tolerance && k < 20))
-        first = false;
-        fprintf('\t Newton iteration: %d \n', k);
-        f = F(allData, u(1),u(2), evecs, evals, eps);                                % calculcate the function to zero
-        neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
-        Df = jacobian(allData, u(1), u(2), w, evecs, evals, eps);                    % find the jacobian
-        invD = Df^(-1);
-        u = u - invD*[f;neww]                                  % perform the Newton step
-        k = k + 1;
-        end
-    
-        %% alternate Newton's method using fsolve
+    newGuess = [embed_2; v0_base2] + stepSize *(w/norm(w)) % first guess on the secant line
+                                	
+    %% alternate Newton's method using fsolve
     u = fsolve(@(u)FW(u,allData,w,newGuess,evecs,evals,eps), newGuess,foptions)
     
     bif(:,iEq) = u;                                            % save the new solution
-    
+    scatter(u(1), u(2), 'k.'); drawnow;
     
     %% reset the values for the arc length continuation
     embed_1 = embed_2;
@@ -133,10 +101,9 @@ hold off;
 figure;
 scatter3(bif(1,:),bif(2,:),bif(3,:),'*');
 xlabel('\Phi_1');
-ylabel('Phi_2');
-zlabel('v0');
+ylabel('\Phi_2');
+zlabel('v_0');
 
-%% functions
 
 %% function to zero for fsolve
 % u         - the current value of (sigma, v0) that we're trying to find
@@ -149,9 +116,10 @@ zlabel('v0');
 % RETURNS:
 % fw    - the functions F and w evaluated at these parameters
     function fw = FW(u,ref,W,newGuess,evecs,evals,lereps)
-        fw = zeros(2,1);
-        fw(1) = F(ref,u(1),u(2),evecs,evals,lereps);
-        fw(2) = W'*(u - newGuess);
+        fw = zeros(3,1);
+        fw(1:2) = F(ref,u(1:2),u(end),evecs,evals,lereps);
+        fw(end) = W'*(u - newGuess);
+        fprintf('F = %d \n\n',norm(fw));
     end
 
 %% lift, evolve, restrict
@@ -165,21 +133,19 @@ zlabel('v0');
 % sigma     - the std. of the headways after restricting has occured
 % new_state - the final state of the evolution, which can be used as a
 %               future reference state
-    function [sigma,new_state, sigma2, new_state2] = ler(newval,orig,t,v0,eigvecs,eigvals,lereps,tReference)
-        lifted = smartLift2d(newval, eigvecs,eigvals,lereps, v0, orig,center);
-        [~,evo] = ode45(@microsystem,[0 t],lifted, options,[v0,len,h]);
+    function [sigma, sigma2] = ler(newval,orig,t,v0,eigvecs,eigvals,lereps,tReference)
+        fprintf('Lifting to: %f \n', newval(1));
+        fprintf('\t and %f \n', newval(2));
+        lifted = smartLift2d(newval, eigvecs, eigvals, lereps,v0, orig);
+        [~,evo] = ode45(@microsystem,[0 t],lifted, options,[v0 len h]);
+        evo = findPeriodic(evo(end,:)', eigvals, eigvecs, orig, lereps, v0, tang, start);        
+        evoCars = getHeadways(evo(1:numCars),len);
+        sigma = diffMapRestrict(evoCars, eigvals, eigvecs, orig, lereps);
         if (nargin > 7)
-            [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,[v0,len,h]);
-            evo2Cars = evo2(end, 1:numCars)';
-            sigma2 = diffMapRestrict(getHeadways(evo2Cars,len),eigvals,eigvecs, orig, lereps);
-        end
-        evoCars = evo(end, 1:numCars)';
-        sigma = diffMapRestrict(getHeadways(evoCars,len), eigvals, eigvecs, orig, lereps);
-        if(nargout >= 2)
-            new_state = evo(end,1:2*numCars)';
-        end
-        if(nargout == 4)
-            new_state2 = evo2(end,1:2*numCars)';
+            [~,evo2] = ode45(@microsystem,[0 tReference],evo, options,[v0 len h]);
+            evo2 = findPeriodic(evo2(end,:)', eigvals, eigvecs, orig, lereps, v0, tang, start);
+            evo2Cars = getHeadways(evo2(1:numCars),len);       
+            sigma2 = diffMapRestrict(evo2Cars,eigvals,eigvecs, orig, lereps);
         end
     end
 
@@ -191,7 +157,7 @@ zlabel('v0');
 %  RETURNS:
 %  dif - the difference which approximates the time derivative
     function dif = F(ref, sigma,v0,eigvecs,eigvals,lereps)
-        [r0, ~, r1] = ler(sigma, ref, tskip, v0, eigvecs,eigvals,lereps, delta);
+        [r0, r1] = ler(sigma, ref, tskip, v0, eigvecs,eigvals,lereps, delta);
         dif = (r1-r0)/delta;
     end
 
@@ -211,27 +177,4 @@ zlabel('v0');
         J(2,:) = w';
     end
 
-%% lifting operator
-% s 	-   the target std. for this state
-% p     -   parameter which will degrade the accuracy of the lifting
-%           operator.  Should be kept at p = 1 by default.
-% hways -   headways of the cars at a reference state
-% v0    -   the goal velocity at this state
-% RETURNS:
-% new   -   the lifted vector of cars and their positions. The cars
-%           will be reset to new positions with the first car centered
-%            at 0, and with headways that will give the desired std. of
-%            s.  The cars' new velocities will be given directly by the
-%            optimal velocity function.
-    function new = lift(s, p, hways, v0)
-        del = p * s/std(hways) * (hways - mean(hways)) + mean(hways);
-        new = zeros(length(hways)*2,1);
-        for iLift=2:length(hways)
-            new(iLift) = mod(sum(del(1:iLift-1)),len);
-        end
-        hways = getHeadways(new(1:length(hways)));
-        for iLift=1:length(hways)
-            new(iLift+length(hways)) = optimalVelocity(hways(iLift), v0);
-        end
-    end
 end

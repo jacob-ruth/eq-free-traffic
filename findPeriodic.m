@@ -1,22 +1,34 @@
-function looped = findPeriodic(cars, eval, evec, oldData, eps, v0)
+function [looped, tangent] = findPeriodic(cars, eval, evec, oldData, eps, v0, tang, started)
 len = 60;
 numCars = length(cars)/2;
 h = 1.2;
-minLoopTime = 60;
 
-hways1 = getHeadways(cars(1:numCars), len);
-startRestrict = diffMapRestrict(hways1, eval, evec, oldData, eps);     % find the starting coordinate
-tangentLine = finiteDifference(cars);
+if(nargin < 7)
+    hways1 = getHeadways(cars(1:numCars), len);
+    startRestrict = diffMapRestrict(hways1, eval, evec, oldData, eps);     % find the starting coordinate
+    tangentLine = finiteDifference(cars);
+    minLoopTime = 65;
+else
+    tangentLine = tang;
+    startRestrict = started;
+    minLoopTime = 0;
+end
 
 eventFunction = @(t,prof)loopEvent(t,prof, [tangentLine startRestrict]);
 
 opts = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
 opts = odeset(opts,'Events',eventFunction);
 
-[~,evolve,te] = ode45(@(t,y)microsystem(t,y,[v0 len h]), [0 1000], cars, opts);
+[~,evolve,te] = ode45(@(t,y)microsystem(t,y,[v0 len h]), [0 200], cars, opts);
+
+if(length(te) < 1)
+    fprintf('No periodic solution found');
+end
 
 looped = evolve(end, :)';
-
+if(nargout > 1)
+    tangent = tangentLine;
+end
 
     function diff = finiteDifference(cars)
         options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
