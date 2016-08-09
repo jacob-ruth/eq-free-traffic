@@ -7,7 +7,7 @@ delta = 500;
 stepSize = .001;        % step size for the secant line approximation
 delSigma = 0.00001;     % delta sigma used for finite difference of F
 delv0 = 0.00001;        % delta v0 used for finite difference of F
-tolerance = 10^(-8);    % tolerance for Newton's method
+tolerance = 10^(-10);    % tolerance for Newton's method
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
 foptions = optimset('TolFun',tolerance);              % fsolve options
 
@@ -33,7 +33,6 @@ colormap(jet);
 xlabel('\Phi_1', 'FontSize',15);
 ylabel('\Phi_2', 'FontSize',15);
 title('\Phi_1 vs. \Phi_2 Colored by Locations of the Max Headways','FontSize',15);
-
 % plot eigenvector 1 vs eigenvector 2, colored by standard deviation
 figure;
 scatter(evecs(:,1), evecs(:,2), 100,  std(allData),'.');
@@ -123,9 +122,8 @@ ylabel('\alpha');
         x = u(1)*psi + x0;
         scale = [1 ; 1 ; 1];
         fw = zeros(3,1);
-        fw(1:2) = F(ref,x(1:2),u(end),evecs,evals,lereps,u(3)) .* scale(1:2);
+        fw(1:2) = F(ref,x(1:2),u(end),evecs,evals,lereps,u(2)) .* scale(1:2);
         fw(end) = dot(W,u - newGuess) * scale(end);
-        fprintf('F = %d \n\t %d \n\t %d\n',fw(1),fw(2),fw(3));
         fprintf('|F| = %d\n\n',norm(fw));
     end
 
@@ -141,16 +139,15 @@ ylabel('\alpha');
 % new_state - the final state of the evolution, which can be used as a
 %               future reference state
     function [sigma, sigma2] = ler(newval,orig,t,v0,eigvecs,eigvals,lereps,tReference)
+        scatter(newval(1), newval(2), 'mx');
         fprintf('Lifting to: %f \n', newval(1));
         fprintf('\t and %f \n', newval(2));
         lifted = smartLift2d(newval, eigvecs, eigvals, lereps,v0, orig);
-        [~,evo] = ode45(@microsystem,[0 t],lifted, options,[v0 len h]);
-%         evo = findPeriodic(evo(end,:)', eigvals, eigvecs, orig, lereps, v0, tan, start);        
+        [~,evo] = ode45(@microsystem,[0 t],lifted, options,[v0 len h]);        
         evoCars = getHeadways(evo(end,1:numCars)',len);
         sigma = diffMapRestrict(evoCars, eigvals, eigvecs, orig, lereps);
         if (nargin > 7)
-            [~,evo2] = ode45(@microsystem,[0 tReference],evo, options,[v0 len h]);
-%             evo2 = findPeriodic(evo2(end,:)', eigvals, eigvecs, orig, lereps, v0, tan, start);
+            [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,:)', options,[v0 len h]);
             evo2Cars = getHeadways(evo2(end,1:numCars)',len);       
             sigma2 = diffMapRestrict(evo2Cars,eigvals,eigvecs, orig, lereps);
         end
