@@ -9,11 +9,12 @@
 % returns a 120 x 1 vector of car positions and velocities that restricts
 % to close to newVal
 function lifted = smartLift2d(newVal, evec, eval, eps,v0, oldData)
+
 h = 1.2;                % optimal velocity parameter
 len = 60;               % length of the ring road
 numCars = 60;           % number of cars
-tolerance = 5e-8;       % lifting tolerance
-distmult = 4;           % how far to go for the vertices of the triangle
+tolerance = 1e-8;       % lifting tolerance
+distmult = 2;           % how far to go for the vertices of the triangle
 
 newVal = reshape(newVal, 1, length(newVal));        % newVal is a row vector
 
@@ -32,7 +33,7 @@ if(norm(newVal) >= radius)
 end
 
 %% loop through closest points until find one that makes a triangle around newVal
-vals = 10000*ones(2,3);
+tic;
 itri = 1;
 vals = 1000*ones(3,2);
 while(itri == 1 || ~PointInTriangle(newVal,vals) )

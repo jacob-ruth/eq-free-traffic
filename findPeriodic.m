@@ -7,7 +7,7 @@
 %
 % returns: profile of positions and velocities arising from evolving cars
 %          for one period
-function [looped, tangent] = findPeriodic(cars, eval, evec, oldData, eps, v0, tang, started)
+function [looped, tangent,tend] = findPeriodic(cars, eval, evec, oldData, eps, v0, tang, started)
 len = 60;
 numCars = length(cars)/2;
 h = 1.2;
@@ -29,6 +29,8 @@ opts = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
 opts = odeset(opts,'Events',eventFunction);
 
 [~,evolve,te] = ode45(@(t,y)microsystem(t,y,[v0 len h]), [0 200], cars, opts);
+
+tend = te(end);
 
 if(length(te) < 1)
     fprintf('No periodic solution found');

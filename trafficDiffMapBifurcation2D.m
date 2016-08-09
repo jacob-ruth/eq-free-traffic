@@ -4,20 +4,14 @@ len = 60;               % length of the ring road
 numCars = 60;           % number of cars
 tskip = 300;            % times for evolving
 delta = 500;
-stepSize = .0002;        % step size for the secant line approximation
+stepSize = .001;        % step size for the secant line approximation
 delSigma = 0.00001;     % delta sigma used for finite difference of F
 delv0 = 0.00001;        % delta v0 used for finite difference of F
-tolerance = 10^(-12);    % tolerance for Newton's method
+tolerance = 10^(-8);    % tolerance for Newton's method
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
 foptions = optimset('TolFun',tolerance);              % fsolve options
 
 %% load diffusion map data
-%{
-load('bigData.mat', 'trafficOutput2');
- allData = getHeadways(trafficOutput2(1:numCars, :), len);
-numEigvecs = 2;                                         % number of eigenvectors to return
-[evecs, evals, eps] = runDiffMap(allData,numEigvecs);   % run the diffusion map
-%}
 load('bigDataMap.mat', 'evecs', 'evals', 'eps', 'allData');
 
 % calculate which eigenvectors are most significant
@@ -53,65 +47,71 @@ title('\Phi_1 vs. \Phi_2 Colored by Standard Deviation of the Headways','FontSiz
 %}
 
 %% initialize secant continuation
-steps = 100;                                % number of steps to take around the curve
+steps = 10;                                % number of steps to take around the curve
 bif = zeros(3,steps);                       % array to hold the bifurcation values
 
 % initialize the first reference state
 load('start0.884800.mat', 'trafficData', 'vel');
-[trafficOutput, tang] = findPeriodic(trafficData, evals, evecs, allData, eps, vel);
+[trafficOutput, tan,t2] = findPeriodic(trafficData, evals, evecs, allData, eps, vel);
 ref_2 = getHeadways(trafficOutput(1:60), len);
 v0_base2 = vel;
-embed_2 = diffMapRestrict(ref_2,evals,evecs,allData,eps);
-start = embed_2;
+leslieann_2 = diffMapRestrict(ref_2,evals,evecs,allData,eps);
+start = leslieann_2;
 
 % initialize the second reference state
 load('start0.885000.mat', 'trafficData', 'vel');
-looped = findPeriodic(trafficData, evals, evecs, allData, eps, vel, tang, start);
+[looped, ~, ~] = findPeriodic(trafficData, evals, evecs, allData, eps, vel, tan, start);
+[~,~,t1] = findPeriodic(looped,evals,evecs,allData,eps,vel);
 ref_1 = getHeadways(looped(1:60), len);
 v0_base1 = vel;
-embed_1 = diffMapRestrict(ref_1,evals,evecs,allData,eps);      %initial sigma values for secant line approximation
+leslieann_1 = diffMapRestrict(ref_1,evals,evecs,allData,eps);      %initial sigma values for secant line approximation
+x0 = leslieann_1;
+embed_1 = [0, t1, v0_base1];
+embed_2 = [norm(leslieann_1-leslieann_2), t2, v0_base2];
+
+psi = (leslieann_2 - leslieann_1)/norm(leslieann_2 - leslieann_1);
 
 figure; hold on;
 scatter(evecs(:,1), evecs(:,2), 'c.');
-scatter(embed_1(1), embed_1(2), 'b*');
-scatter(embed_2(1), embed_2(2), 'ro');
+scatter(leslieann_1(1), leslieann_1(2), 'b*');
+scatter(leslieann_2(1), leslieann_2(2), 'ro');
+drawnow;
 
 %% pseudo arc length continuation
 for iEq=1:steps
     fprintf('Starting iteration %d of %d \n', iEq, steps);
-    w = [embed_2 - embed_1 ; v0_base2 - v0_base1];          % slope of the secant line
-    newGuess = [embed_2; v0_base2] + stepSize *(w/norm(w)); % first guess on the secant line
+    w = embed_2-embed_1;          % slope of the secant line
+    newGuess = embed_2 + stepSize *(w/norm(w)); % first guess on the secant line
                                 	
     %% alternate Newton's method using fsolve
     u = fsolve(@(u)FW(u,allData,w,newGuess,evecs,evals,eps), newGuess,foptions)
     
     bif(:,iEq) = u;                                            % save the new solution
-    scatter(u(1), u(2), 'k.'); drawnow;
+    
     
     %% reset the values for the arc length continuation
+    leslieann_2 = u(1)*psi + x0;                     % find the new reference state
+    scatter(leslieann_2(1),leslieann_2(2),200,'r.'); drawnow;
+    
     embed_1 = embed_2;
-    v0_base1 = v0_base2;
-    v0_base2 = u(end);
-    embed_2 = u(1:2);                     % find the new reference state
+    embed_2 = u;
 end
 hold off;
 
 %% plot the bifurcation diagram
 figure;
 scatter3(bif(1,:),bif(2,:),bif(3,:),'*');
-xlabel('\Phi_1');
-ylabel('\Phi_2');
+xlabel('\alpha');
+ylabel('T');
 zlabel('v_0');
 
-rad = sqrt(bif(1,:).^2 + bif(2,:).^2);
 figure;
-scatter(bif(3,:), rad, 'b.');
+scatter(bif(3,:), bif(1,:), 300, 'b.');
 xlabel('v_0');
-ylabel('\sigma');
+ylabel('\alpha');
 
 %% function to zero for fsolve
-% u         - the current value of (sigma, v0) that we're trying to find
-%               with Newton's method
+% u         - the current value of (alpha,T,v0)
 % ref       - the most recent reference state
 % W         - the slope of the secant line for arc length continuation
 % newGuess  - the first guess on the secant line for arc length
@@ -120,10 +120,13 @@ ylabel('\sigma');
 % RETURNS:
 % fw    - the functions F and w evaluated at these parameters
     function fw = FW(u,ref,W,newGuess,evecs,evals,lereps)
+        x = u(1)*psi + x0;
+        scale = [1 ; 1 ; 1];
         fw = zeros(3,1);
-        fw(1:2) = F(ref,u(1:2),u(end),evecs,evals,lereps);
-        fw(end) = W'*(u - newGuess);
-        fprintf('F = %d \n\n',norm(fw));
+        fw(1:2) = F(ref,x(1:2),u(end),evecs,evals,lereps,u(3)) .* scale(1:2);
+        fw(end) = dot(W,u - newGuess) * scale(end);
+        fprintf('F = %d \n\t %d \n\t %d\n',fw(1),fw(2),fw(3));
+        fprintf('|F| = %d\n\n',norm(fw));
     end
 
 %% lift, evolve, restrict
@@ -142,13 +145,13 @@ ylabel('\sigma');
         fprintf('\t and %f \n', newval(2));
         lifted = smartLift2d(newval, eigvecs, eigvals, lereps,v0, orig);
         [~,evo] = ode45(@microsystem,[0 t],lifted, options,[v0 len h]);
-        evo = findPeriodic(evo(end,:)', eigvals, eigvecs, orig, lereps, v0, tang, start);        
-        evoCars = getHeadways(evo(1:numCars),len);
+%         evo = findPeriodic(evo(end,:)', eigvals, eigvecs, orig, lereps, v0, tan, start);        
+        evoCars = getHeadways(evo(end,1:numCars)',len);
         sigma = diffMapRestrict(evoCars, eigvals, eigvecs, orig, lereps);
         if (nargin > 7)
             [~,evo2] = ode45(@microsystem,[0 tReference],evo, options,[v0 len h]);
-            evo2 = findPeriodic(evo2(end,:)', eigvals, eigvecs, orig, lereps, v0, tang, start);
-            evo2Cars = getHeadways(evo2(1:numCars),len);       
+%             evo2 = findPeriodic(evo2(end,:)', eigvals, eigvecs, orig, lereps, v0, tan, start);
+            evo2Cars = getHeadways(evo2(end,1:numCars)',len);       
             sigma2 = diffMapRestrict(evo2Cars,eigvals,eigvecs, orig, lereps);
         end
     end
@@ -160,8 +163,8 @@ ylabel('\sigma');
 %  v0 - the velocity parameter for this state
 %  RETURNS:
 %  dif - the difference which approximates the time derivative
-    function dif = F(ref, sigma,v0,eigvecs,eigvals,lereps)
-        [r0, r1] = ler(sigma, ref, tskip, v0, eigvecs,eigvals,lereps, delta);
+    function dif = F(ref, sigma,v0,eigvecs,eigvals,lereps,t)
+        [r0, r1] = ler(sigma, ref, t, v0, eigvecs,eigvals,lereps, t);
         dif = (r1-r0)/delta;
     end
 
