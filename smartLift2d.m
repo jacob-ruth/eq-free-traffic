@@ -1,14 +1,14 @@
-%% function lifted creates a traveling wave profile based on desired diffusion map coordinates
-% newVal - the desired diffusion map embedding
-% evec - eigenvectors of the diffusion map
-% eval - eigenvalues of the diffusion map
-% eps - epsilon from the diffusion map
-% v0 - optimal velocity parameter
-% oldData - data used to build the diffusion map
-% Returns:
-% lifted - car positions and velocities
+%% two-dimensional lifting operator
+% newVal    - 1x2 vector representing the desired Leslie and Ann values
+% evec      - eigenvectors from diffusion map in columns
+% eval      - eigenvalues from diffusion map
+% eps       - epsilon from diffusion map
+% v0        - v0 parameter value
+% oldData   - data from which the diffusion map was constructed
+%
+% returns a 120 x 1 vector of car positions and velocities that restricts
+% to close to newVal
 function lifted = smartLift2d(newVal, evec, eval, eps,v0, oldData)
-
 h = 1.2;                % optimal velocity parameter
 len = 60;               % length of the ring road
 numCars = 60;           % number of cars
@@ -16,20 +16,23 @@ tolerance = 5e-8;       % lifting tolerance
 distmult = 4;           % how far to go for the vertices of the triangle
 
 newVal = reshape(newVal, 1, length(newVal));        % newVal is a row vector
-difs = evec - repmat(newVal,size(evec,1),1);        % distance of each point from newVal
-allDists = sqrt(sum(difs.^2,2));                    
-[~,sortidx] = sort(allDists);                       % sorted distances from newVal
 
-% check if the lifting coordinate desired is outside of the data set
+%% calculate distance from each known data point to newVal
+difs = evec - repmat(newVal,size(evec,1),1);
+allDists = sqrt(sum(difs.^2,2));
+[~,sortidx] = sort(allDists);
+
+%% check if outside data set
 radius = max(max(abs(evec(:,1)),max(abs(evec(:,2)))));
-if(newVal(1)^2 + newVal(2)^2 >= radius^2)
+if(norm(newVal) >= radius)
     closeidx = sortidx(1);
     lifted = [cumsum(oldData(:,closeidx)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx)),len),v0)];
     fprintf('Lifting to value outside of data set \n');
     return;
 end
 
-% find an initial triangle that contains newVal
+%% loop through closest points until find one that makes a triangle around newVal
+vals = 10000*ones(2,3);
 itri = 1;
 vals = 1000*ones(3,2);
 while(itri == 1 || ~PointInTriangle(newVal,vals) )
@@ -39,7 +42,7 @@ end
 x = toc;
 fprintf('Found a triangle in %d step(s) and %f seconds \n', itri-1, x);
 
-% shrink the triangle until it converges around newVal
+%% split the longest side to converge on newVal
 first = true;
 done = false;
 notMedian = false;
@@ -122,7 +125,11 @@ if(~done)
     lifted = triangle(:,sortidx(1));
 end
 
+%% given a profile, evolve it for one period and restrict to Leslie/Ann
 % cars - 2*numCars vector of positions (NOT HEADWAYS) and velocities
+%
+% returns: l    - the evolved profile
+%          val  - the restricted Leslie/Ann values
     function [l, val] = evolveRestrict(cars)
         l = findPeriodic(cars,eval,evec,oldData,eps,v0);
         restricted = diffMapRestrict(getHeadways(l(1:numCars),len),...
@@ -130,6 +137,11 @@ end
         val = restricted';
     end
 
+%% detect whether p1 and p2 are on the same side of the line AB
+% p1    - 2x1 vector representing the first point
+% p2    - 2x1 vector representing the second point
+% a     - 2x1 vector representing the one point on the line
+% b     - 2x1 vector representing the second point defining the line
     function res = SameSide(p1,p2, a,b)
         a = [a 0];
         b = [b 0];
@@ -145,6 +157,9 @@ end
     end
 
 
+%% detects whether a point is in a given triangle
+% p     - 2x1 vector representing the point to check
+% t     - 3x2 matrix representing the triangle with the points in rows
     function res = PointInTriangle(p, t)
         a = t(1,:);
         b = t(2,:);

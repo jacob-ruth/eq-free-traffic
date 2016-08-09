@@ -1,3 +1,12 @@
+%% finds the evolved state that has gone around the ring road exactly once
+% cars  - 2*numCars vector of positions (NOT HEADWAYS) and velocities
+% eval  - eigenvalues from diffusion map
+% evec  - eigenvectors from diffusion map in columns
+% eps   - epsilon from diffusion map
+% v0    - v0 (optimal velocity) parameter
+%
+% returns: profile of positions and velocities arising from evolving cars
+%          for one period
 function [looped, tangent] = findPeriodic(cars, eval, evec, oldData, eps, v0, tang, started)
 len = 60;
 numCars = length(cars)/2;
