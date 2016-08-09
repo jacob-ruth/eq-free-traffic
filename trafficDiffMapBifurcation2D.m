@@ -4,10 +4,10 @@ len = 60;               % length of the ring road
 numCars = 60;           % number of cars
 tskip = 300;            % times for evolving
 delta = 500;
-stepSize = .001;        % step size for the secant line approximation
+stepSize = .0002;        % step size for the secant line approximation
 delSigma = 0.00001;     % delta sigma used for finite difference of F
 delv0 = 0.00001;        % delta v0 used for finite difference of F
-tolerance = 10^(-9);    % tolerance for Newton's method
+tolerance = 10^(-12);    % tolerance for Newton's method
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
 foptions = optimset('TolFun',tolerance);              % fsolve options
 
@@ -19,8 +19,7 @@ numEigvecs = 2;                                         % number of eigenvectors
 [evecs, evals, eps] = runDiffMap(allData,numEigvecs);   % run the diffusion map
 %}
 load('bigDataMap.mat', 'evecs', 'evals', 'eps', 'allData');
-[evecs,ia,~] = unique(evecs, 'rows');
-allData = allData(:, ia);
+
 % calculate which eigenvectors are most significant
 %{
 r = zeros(numEigvecs, 1);
@@ -54,7 +53,7 @@ title('\Phi_1 vs. \Phi_2 Colored by Standard Deviation of the Headways','FontSiz
 %}
 
 %% initialize secant continuation
-steps = 20;                                % number of steps to take around the curve
+steps = 100;                                % number of steps to take around the curve
 bif = zeros(3,steps);                       % array to hold the bifurcation values
 
 % initialize the first reference state
@@ -81,7 +80,7 @@ scatter(embed_2(1), embed_2(2), 'ro');
 for iEq=1:steps
     fprintf('Starting iteration %d of %d \n', iEq, steps);
     w = [embed_2 - embed_1 ; v0_base2 - v0_base1];          % slope of the secant line
-    newGuess = [embed_2; v0_base2] + stepSize *(w/norm(w)) % first guess on the secant line
+    newGuess = [embed_2; v0_base2] + stepSize *(w/norm(w)); % first guess on the secant line
                                 	
     %% alternate Newton's method using fsolve
     u = fsolve(@(u)FW(u,allData,w,newGuess,evecs,evals,eps), newGuess,foptions)
@@ -104,6 +103,11 @@ xlabel('\Phi_1');
 ylabel('\Phi_2');
 zlabel('v_0');
 
+rad = sqrt(bif(1,:).^2 + bif(2,:).^2);
+figure;
+scatter(bif(3,:), rad, 'b.');
+xlabel('v_0');
+ylabel('\sigma');
 
 %% function to zero for fsolve
 % u         - the current value of (sigma, v0) that we're trying to find
@@ -159,22 +163,6 @@ zlabel('v_0');
     function dif = F(ref, sigma,v0,eigvecs,eigvals,lereps)
         [r0, r1] = ler(sigma, ref, tskip, v0, eigvecs,eigvals,lereps, delta);
         dif = (r1-r0)/delta;
-    end
-
-%% Jacobian for newton's method
-% ref - The previous reference state used to compute F.
-% sigma - the current value of sigma
-% v0 - the velocity parameter for this state
-% w - the secant direction
-% J- The Jacobian, which will be given by
-% | F_sigma    F_v0  |
-% | w_sigma    w_vo  |
-    function J = jacobian(ref, sigma, v0,w,eigvecs,eigvals,lereps)
-        J = zeros(2);
-        unchanged = F(ref, sigma, v0,eigvecs,eigvals,lereps);
-        J(1,1) = (F(ref, sigma + delSigma, v0,eigvecs,eigvals,lereps) - unchanged)/delSigma;
-        J(1,2) = (F(ref, sigma,v0 + delv0,eigvecs,eigvals,lereps) - unchanged)/delv0;
-        J(2,:) = w';
     end
 
 end
