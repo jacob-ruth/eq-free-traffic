@@ -2,12 +2,8 @@ function trafficDiffMapBifurcation2D()
 h = 1.2;                % optimal velocity parameter
 len = 60;               % length of the ring road
 numCars = 60;           % number of cars
-tskip = 300;            % times for evolving
-delta = 500;
-stepSize = .001;        % step size for the secant line approximation
-delSigma = 0.00001;     % delta sigma used for finite difference of F
-delv0 = 0.00001;        % delta v0 used for finite difference of F
-tolerance = 10^(-10);    % tolerance for Newton's method
+stepSize = .0002;        % step size for the secant line approximation
+tolerance = 10^(-14);    % tolerance for Newton's method
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
 foptions = optimset('TolFun',tolerance);              % fsolve options
 
@@ -46,7 +42,7 @@ title('\Phi_1 vs. \Phi_2 Colored by Standard Deviation of the Headways','FontSiz
 %}
 
 %% initialize secant continuation
-steps = 10;                                % number of steps to take around the curve
+steps = 100;                                % number of steps to take around the curve
 bif = zeros(3,steps);                       % array to hold the bifurcation values
 
 % initialize the first reference state
@@ -87,10 +83,9 @@ for iEq=1:steps
     
     bif(:,iEq) = u;                                            % save the new solution
     
-    
     %% reset the values for the arc length continuation
     leslieann_2 = u(1)*psi + x0;                     % find the new reference state
-    scatter(leslieann_2(1),leslieann_2(2),200,'r.'); drawnow;
+    scatter(leslieann_2(1),leslieann_2(2),'m.'); drawnow;
     
     embed_1 = embed_2;
     embed_2 = u;
@@ -108,6 +103,28 @@ figure;
 scatter(bif(3,:), bif(1,:), 300, 'b.');
 xlabel('v_0');
 ylabel('\alpha');
+
+%% Jacobian for newton's method
+% ref - The previous reference state used to compute F.
+% sigma - the current value of sigma
+% v0 - the velocity parameter for this state
+% w - the secant direction
+% J- The Jacobian, which will be given by
+% | F_sigma    F_v0  |
+% | w_sigma    w_vo  |
+    function J = jacobian(ref, embed, v0,w,eigvecs,eigvals,lereps)
+        J = zeros(3);
+        delAlpha = 10^(-7);
+        delT = 10^(-3);
+        delv0 = 10^(-7);
+        x1 = embed(1)*psi + x0;
+        xDelta = (embed(1) + delAlpha)*psi + x0;
+        unchanged = F(ref, x1, v0,eigvecs,eigvals,lereps, embed(2));
+        J(1:2,1) = (F(ref, xDelta, v0,eigvecs,eigvals,lereps, embed(2)) - unchanged)/delAlpha;
+        J(1:2,2) = (F(ref, x1,v0,eigvecs,eigvals,lereps,embed(2)+delT) - unchanged)/delT;
+        J(1:2,3) = (F(ref, x1,v0 + delv0,eigvecs,eigvals,lereps, embed(2)) - unchanged)/delv0;
+        J(3,:) = w';
+    end
 
 %% function to zero for fsolve
 % u         - the current value of (alpha,T,v0)
@@ -139,8 +156,7 @@ ylabel('\alpha');
 % new_state - the final state of the evolution, which can be used as a
 %               future reference state
     function [sigma, sigma2] = ler(newval,orig,t,v0,eigvecs,eigvals,lereps,tReference)
-        scatter(newval(1), newval(2), 'mx');
-        fprintf('Lifting to: %f \n', newval(1));
+        fprintf('Lifting to:  %f \n', newval(1));
         fprintf('\t and %f \n', newval(2));
         lifted = smartLift2d(newval, eigvecs, eigvals, lereps,v0, orig);
         [~,evo] = ode45(@microsystem,[0 t],lifted, options,[v0 len h]);        
@@ -161,7 +177,9 @@ ylabel('\alpha');
 %  RETURNS:
 %  dif - the difference which approximates the time derivative
     function dif = F(ref, sigma,v0,eigvecs,eigvals,lereps,t)
-        [r0, r1] = ler(sigma, ref, t, v0, eigvecs,eigvals,lereps, t);
+        delta = 28*t;
+        tskip = 4*t;
+        [r0, r1] = ler(sigma, ref, tskip, v0, eigvecs,eigvals,lereps, delta);
         dif = (r1-r0)/delta;
     end
 
