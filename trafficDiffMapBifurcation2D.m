@@ -5,7 +5,8 @@ numCars = 60;           % number of cars
 stepSize = .0002;        % step size for the secant line approximation
 tolerance = 10^(-14);    % tolerance for Newton's method
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
-foptions = optimset('TolFun',tolerance);              % fsolve options
+%foptions = optimset('TolFun',tolerance);              % fsolve options
+foptions = optimoptions(@fsolve, 'TolFun', tolerance,'SpecifyObjectiveGradient',true, 'CheckGradients', true);
 
 %% load diffusion map data
 load('bigDataMap.mat', 'evecs', 'evals', 'eps', 'allData');
@@ -61,8 +62,8 @@ ref_1 = getHeadways(looped(1:60), len);
 v0_base1 = vel;
 leslieann_1 = diffMapRestrict(ref_1,evals,evecs,allData,eps);      %initial sigma values for secant line approximation
 x0 = leslieann_1;
-embed_1 = [0, t1, v0_base1];
-embed_2 = [norm(leslieann_1-leslieann_2), t2, v0_base2];
+embed_1 = [0 ; t1 ; v0_base1];
+embed_2 = [norm(leslieann_1-leslieann_2) ; t2 ; v0_base2];
 
 psi = (leslieann_2 - leslieann_1)/norm(leslieann_2 - leslieann_1);
 
@@ -77,9 +78,28 @@ for iEq=1:steps
     fprintf('Starting iteration %d of %d \n', iEq, steps);
     w = embed_2-embed_1;          % slope of the secant line
     newGuess = embed_2 + stepSize *(w/norm(w)); % first guess on the secant line
+    
+    disp(newGuess);
+    
+    first = true;
+    u = newGuess;
+    k = 1;
                                 	
+    %% Newton and that other guy's method
+    while(first ||(norm(invD*fw)>tolerance && k < 20))
+        first = false;
+        fprintf('\tNewton iteration: %d \n', k);
+        [fw, Df] = FW(u, allData, w, newGuess, evecs, evals, eps);    % calculcate the function to zero                   % find the jacobian
+        invD = Df^(-1);
+        u = u - invD*fw;                                % perform the Newton step
+        k = k + 1;
+        leslieann = u(1)*psi + x0;                     % find the new reference state
+        scatter(leslieann(1),leslieann(2),'k.'); drawnow;
+        disp(u);
+    end
+    
     %% alternate Newton's method using fsolve
-    u = fsolve(@(u)FW(u,allData,w,newGuess,evecs,evals,eps), newGuess,foptions)
+    %u = fsolve(@(u)FW(u,allData,w,newGuess,evecs,evals,eps), newGuess,foptions)
     
     bif(:,iEq) = u;                                            % save the new solution
     
@@ -114,9 +134,9 @@ ylabel('\alpha');
 % | w_sigma    w_vo  |
     function J = jacobian(ref, embed, v0,w,eigvecs,eigvals,lereps)
         J = zeros(3);
-        delAlpha = 10^(-7);
-        delT = 10^(-3);
-        delv0 = 10^(-7);
+        delAlpha = 8*10^(-9);
+        delT = 10^(-5);
+        delv0 = 10^(-8);
         x1 = embed(1)*psi + x0;
         xDelta = (embed(1) + delAlpha)*psi + x0;
         unchanged = F(ref, x1, v0,eigvecs,eigvals,lereps, embed(2));
@@ -124,6 +144,7 @@ ylabel('\alpha');
         J(1:2,2) = (F(ref, x1,v0,eigvecs,eigvals,lereps,embed(2)+delT) - unchanged)/delT;
         J(1:2,3) = (F(ref, x1,v0 + delv0,eigvecs,eigvals,lereps, embed(2)) - unchanged)/delv0;
         J(3,:) = w';
+        disp(J);
     end
 
 %% function to zero for fsolve
@@ -135,13 +156,16 @@ ylabel('\alpha');
 %
 % RETURNS:
 % fw    - the functions F and w evaluated at these parameters
-    function fw = FW(u,ref,W,newGuess,evecs,evals,lereps)
+    function [fw, j] = FW(u,ref,W,newGuess,evecs,evals,lereps)
         x = u(1)*psi + x0;
         scale = [1 ; 1 ; 1];
         fw = zeros(3,1);
         fw(1:2) = F(ref,x(1:2),u(end),evecs,evals,lereps,u(2)) .* scale(1:2);
         fw(end) = dot(W,u - newGuess) * scale(end);
-        fprintf('|F| = %d\n\n',norm(fw));
+        fprintf('\t|F| = %d\n\n',norm(fw));
+        if(nargout > 1)
+            j = jacobian(ref, u(1:2), u(end), W, evecs, evals, lereps);
+        end
     end
 
 %% lift, evolve, restrict
@@ -156,8 +180,8 @@ ylabel('\alpha');
 % new_state - the final state of the evolution, which can be used as a
 %               future reference state
     function [sigma, sigma2] = ler(newval,orig,t,v0,eigvecs,eigvals,lereps,tReference)
-        fprintf('Lifting to:  %f \n', newval(1));
-        fprintf('\t and %f \n', newval(2));
+        fprintf('\tLifting to:  %f \n', newval(1));
+        fprintf('\t\t and %f \n', newval(2));
         lifted = smartLift2d(newval, eigvecs, eigvals, lereps,v0, orig);
         [~,evo] = ode45(@microsystem,[0 t],lifted, options,[v0 len h]);        
         evoCars = getHeadways(evo(end,1:numCars)',len);

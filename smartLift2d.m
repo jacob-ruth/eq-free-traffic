@@ -13,7 +13,7 @@ function lifted = smartLift2d(newVal, evec, eval, eps,v0, oldData)
 h = 1.2;                % optimal velocity parameter
 len = 60;               % length of the ring road
 numCars = 60;           % number of cars
-tolerance = 1e-8;       % lifting tolerance
+tolerance = 1e-12;       % lifting tolerance
 distmult = 2;           % how far to go for the vertices of the triangle
 
 newVal = reshape(newVal, 1, length(newVal));        % newVal is a row vector
@@ -41,7 +41,7 @@ while(itri == 1 || ~PointInTriangle(newVal,vals) )
     itri = itri+1;
 end
 x = toc;
-fprintf('Found a triangle in %d step(s) and %f seconds \n', itri-1, x);
+fprintf('\tFound a triangle in %d step(s) and %f seconds \n', itri-1, x);
 
 %% split the longest side to converge on newVal
 first = true;
@@ -49,13 +49,13 @@ done = false;
 notMedian = false;
 iter = 1;
 tic;
-while((first || ~done) && iter <= 50)
+while((first || ~done) && iter <= 500)
     iter = iter + 1;
     
     % if the triangle is stuck at the previous locations, create a new
     % initial triangle
     if(notMedian)
-        fprintf('Triangle stalled \n');
+        fprintf('\tTriangle stalled \n');
         while(notMedian || ~PointInTriangle(newVal,vals) )
            notMedian = false;
            [triangle, vals] = findTriangle(itri);
@@ -115,11 +115,11 @@ while((first || ~done) && iter <= 50)
     end
 end
 x = toc;
-fprintf('Triangle converged in %d step(s) and %f seconds \n', iter-1, x);
+fprintf('\tTriangle converged in %d step(s) and %f seconds \n', iter-1, x);
 
 % if the triangle doesn't converge, return the closest profile
 if(~done)
-    fprintf('Triangle did not converge \n');
+    fprintf('\tTriangle did not converge \n');
     dists = vals  - repmat(newVal, 3,1);
     distances = sqrt(sum(dists.^2,2));
     [~,sortidx] = sort(distances);
