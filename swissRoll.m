@@ -35,37 +35,31 @@ function swissRoll()
     [newvec, newval] = diffusionMap(eps, squareform(pdist(newData)),k);
     newEigCoor = diffMapRestrict(specialPoint',newval,newvec,newData',eps)
 
-    % compute how unique the eigen directions given by the vectors are
-%     r = zeros(k,1);
-%     r(1) = 1;                    	% assume the first direction is important
-%     for i=2:k
-%         r(i) = linearFit(vec, i);
-%     end
-%     % display the values of r
-%     fprintf('The values of r_k are \n');
-%     disp(r);
+%{
+% compute how unique the eigen directions given by the vectors are
+ r = zeros(k,1);
+r(1) = 1;                    	% assume the first direction is important
+for i=2:k
+    r(i) = linearFit(vec, i);
+end
+% display the values of r
+fprintf('The values of r_k are \n');
+disp(r);
+%}
 
     % plot the data colored by the eigen directions
     figure;
-    hold on;
     scatter3(data(:,1), data(:,2), data(:,3), 500, vec(:,1),'.');
-    title('Data colored by first eigen-direction (h=40)','FontSize',30);
-    hold off;
+    title('Data Colored by First Eigen-Direction','FontSize',20);
+    colormap(jet);
+    h = colorbar;
+    xlabel(h, '\Phi_1', 'fontsize', 15)
 
     figure;
     scatter3(data(:,1), data(:,2), data(:,3), 500, vec(:,2),'.');
-    title('Data colored by second eigen-direction (h=40)','FontSize',30);
-
-    figure;
-    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,3),'.');
-    title('Data colored by third eigen-direction');
-
-    figure;
-    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,4),'.');
-    title('Data colored by fourth eigen-direction');
-
-    figure;
-    scatter3(data(:,1), data(:,2), data(:,3), 200, vec(:,5),'.');
-    title('Data colored by fifth eigen-direction');
+    title('Data Colored by Second Eigen-Direction','FontSize',20);
+    colormap(jet);
+    h = colorbar;
+    xlabel(h, '\Phi_2', 'fontsize', 15)
 
 end
