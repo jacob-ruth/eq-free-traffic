@@ -8,7 +8,7 @@
 % returns diffusion map embedding for new data using the Nystrom extension
 % in a column vector
 function pnew = diffMapRestrict(newData,evals,evecs,origData,eps)
-dist = pdist2(newData',origData')';
+dist = pdist2(newData',origData')';     % calculate the pairwise distances between newData and origData
 w = basicKernel(dist);
 k = (1/sum(w))*w;
 pnew = (evecs' * k)./diag(evals);
