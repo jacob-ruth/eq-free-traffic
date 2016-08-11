@@ -41,6 +41,8 @@ if(nargout > 1)
     tangent = tangentLine;
 end
 
+    %% Find difference between starting state and state after evolve-restrict
+    % cars - vector of car positions representing the starting state
     function diff = finiteDifference(cars)
         options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
         hwaysStart = getHeadways(cars(1:numCars), len);
@@ -51,6 +53,10 @@ end
         diff = start - final;
     end
 
+    %% event function determining whether the traveling wave has reached its starting position
+    % t - time (used to reduce number of restrictions)
+    % prof - car profile given in positions
+    % param - parameters consisting of tan (the starting gradient) and start (the starting point)
     function [dif,isTerminal,direction] = loopEvent(t,prof, param)
         tan = param(:,1);
         start = param(:,2);
