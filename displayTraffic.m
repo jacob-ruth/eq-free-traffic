@@ -1,3 +1,6 @@
+%% function displayTraffic animates cars on a ring road
+% u - car positions and velocities
+% L - length of the ring road
 function displayTraffic(u, L)
     [numVars,N] = size(u);
     carPositions = u(1:numVars/2, :);
