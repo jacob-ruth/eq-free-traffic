@@ -16,7 +16,7 @@ function trafficBifurcation()
     v0_base1 = 0.91;        % initial velocities for secant line approximation
     v0_base2 = 0.9;
     
-	options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
+    options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
     
     %% initialize car posoitions and velocities
     cars_1 = zeros(2*numCars, 1);
@@ -62,7 +62,7 @@ function trafficBifurcation()
         %% Newton and that other guy's method
         while(first ||(norm(invD*[f;neww])>tolerance && k < 20))
             first = false;
-            fprintf('\t Newton iteration: %d \n', k);
+            fprintf('\tNewton iteration: %d \n', k);
             f = F(ref_2, u(1),u(2));                                % calculcate the function to zero
             neww = w(1)*(u(1)-newGuess(1)) + w(2)*(u(2) - newGuess(2));
             Df = jacobian(ref_2, u(1), u(2), w);                    % find the jacobian
