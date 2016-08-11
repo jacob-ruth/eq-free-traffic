@@ -1,3 +1,4 @@
+%% function microsystemBifurcation creates the bifurcation diagram using the microsystem only
 function microsystemBifurcation()
 h = 1.2;
 len = 60;
