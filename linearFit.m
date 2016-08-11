@@ -2,6 +2,7 @@
 % the directions given by the previous eigenvectors
 % evecs - matrix containing all of the eigenvectors
 % k - the eigenvector to study
+% Returns:
 % res - the linear fit of eigenvector k from the k-1 previous eigenvectors
 function res = linearFit(evecs,k)
 m = size(evecs,1);                      % number of data points
