@@ -1,5 +1,5 @@
 # eq-free-traffic
-This repository is the work of Tracy Chin, Rebecca Santorella, and Jacob Ruth, during the 2016 Summer@ICERM projects.  
+This repository is the work of Tracy Chin, Rebecca Santorella, and Jacob Ruth, during the 2016 Summer@ICERM program.  
 
 Files of interest:
 - microsystemBifurcation.m contains code that will find the steady state of the traffic wave, not using any macrolevel variable.
