@@ -1,5 +1,3 @@
-    function DM = fourdif(N,m)
-%
 % The function [x, DM] = fourdif(N,m) computes the m'th derivative Fourier 
 % spectral differentiation matrix on grid with N equispaced points in [0,2pi)
 % 
@@ -26,7 +24,7 @@
 %  S.C. Reddy, J.A.C. Weideman 1998.  Corrected for MATLAB R13 
 %  by JACW, April 2003.
  
-
+function DM = fourdif(N,m)
     x=2*pi*(0:N-1)'/N;                       % gridpoints
     h=2*pi/N;                                % grid spacing
     zi=sqrt(-1);
