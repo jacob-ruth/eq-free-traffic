@@ -1,3 +1,6 @@
+%% This file plots the start and two endpoint of a traveling wave after evolving the traffic system
+% as well as the evolution of sigma
+
 options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
 h = 1.2;
 v0 = 0.89;
