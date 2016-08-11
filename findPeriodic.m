@@ -4,6 +4,8 @@
 % evec  - eigenvectors from diffusion map in columns
 % eps   - epsilon from diffusion map
 % v0    - v0 (optimal velocity) parameter
+% tang - tangent line to align to (optional)
+% started - starting position to align to (optional)
 %
 % returns: profile of positions and velocities arising from evolving cars
 %          for one period
@@ -12,12 +14,13 @@ len = 60;
 numCars = length(cars)/2;
 h = 1.2;
 
+% either align the period to the current starting point
 if(nargin < 7)
     hways1 = getHeadways(cars(1:numCars), len);
     startRestrict = diffMapRestrict(hways1, eval, evec, oldData, eps);     % find the starting coordinate
     tangentLine = finiteDifference(cars);
     minLoopTime = 65;
-else
+else % or slign the period to the supplied position and tangent line
     tangentLine = tang;
     startRestrict = started;
     minLoopTime = 0;
@@ -39,6 +42,7 @@ if(nargout > 1)
     tangent = tangentLine;
 end
 
+    % calculate the tangent line through a finite difference approximation
     function diff = finiteDifference(cars)
         options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
         hwaysStart = getHeadways(cars(1:numCars), len);
@@ -48,7 +52,8 @@ end
         final = diffMapRestrict(hwaysEnd, eval, evec, oldData, eps);
         diff = start - final;
     end
-
+    
+    % find a periodic orbit
     function [dif,isTerminal,direction] = loopEvent(t,prof, param)
         tan = param(:,1);
         start = param(:,2);
