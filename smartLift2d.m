@@ -79,19 +79,6 @@ while((first || ~done) && iter <= 500)
         notMedian = false;
     end
     
-    %{
-    clf;
-    hold on;
-    scatter(vals(:,1),vals(:,2),'b*');
-    scatter(newpoint(1),newpoint(2),'c*');
-    scatter(newVal(1),newVal(2),'r*');
-    if(~first)
-        scatter(oldVal(1),oldVal(2),'ko');
-    end
-    drawnow;
-    hold off;
-    %} 
-    
     % check if the triangle has converged yet
     if(norm(newpoint - newVal) < tolerance)
         done = true;
@@ -107,7 +94,7 @@ while((first || ~done) && iter <= 500)
             triangle = [triangle(:,[2 3]), newprof];
             vals = [vals([2 3],:); newpoint];
         else
-            warning('NOT IN A TRIANGLE (WELL TECHNICALLY ITS IN LOTS OF TRIANGLES BUT NONE OF OURS)');
+            warning('NOT IN A TRIANGLE');
         end
         
         first = false;
