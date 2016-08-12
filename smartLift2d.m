@@ -107,7 +107,7 @@ while((first || ~done) && iter <= 500)
             triangle = [triangle(:,[2 3]), newprof];
             vals = [vals([2 3],:); newpoint];
         else
-            warning('NOT IN A TRIANGLE (WELL TECHNICALLY ITS IN LOTS OF TRIANGLES BUT NONE OF OURS)');
+            warning('NOT IN A TRIANGLE');
         end
         
         first = false;
@@ -179,7 +179,8 @@ end
 % values - the diffusion map coordinates of the triangle
     function [tri, values] = findTriangle(itri)
         closeidx = sortidx(itri);   % find the first vertex at the itri closest position
-        [closestprof,closestvals] = evolveRestrict([cumsum(oldData(:,closeidx)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx)),len),v0)]);
+        closestprof = [hwayToPos(oldData(:,closeidx)); optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx)),len),v0)];
+        [~,closestvals] = evolveRestrict(closestprof);
         
         displacement = newVal - closestvals;    %vector from target to close (hopefully) point
         
@@ -191,12 +192,14 @@ end
         difs1 = evec - repmat(pts(1,:),size(evec,1),1); % find the closest profile to the second vertex
         allDists1 = sqrt(sum(difs1.^2,2));
         [~, closeidx1] = min(allDists1);
-        [closestprof1,closestvals1] = evolveRestrict([cumsum(oldData(:,closeidx1)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx1)),len),v0)]);
+        closestprof1 = [hwayToPos(oldData(:,closeidx1)); optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx1)),len),v0)];
+        [~,closestvals1] = evolveRestrict(closestprof1);
         
         difs2 = evec - repmat(pts(2,:),size(evec,1),1); % find the closest profile to the third vertex
         allDists2 = sqrt(sum(difs2.^2,2));
         [~, closeidx2] = min(allDists2);
-        [closestprof2,closestvals2] = evolveRestrict([cumsum(oldData(:,closeidx2)) ; optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx2)),len),v0)]);
+        closestprof2 = [hwayToPos(oldData(:,closeidx2)); optimalVelocity(h,getHeadways(cumsum(oldData(:,closeidx2)),len),v0)];
+        [~,closestvals2] = evolveRestrict(closestprof2);
         
         % return the profiles and coordinates of the triangle
         tri = [closestprof closestprof1 closestprof2];            % profiles in columns
