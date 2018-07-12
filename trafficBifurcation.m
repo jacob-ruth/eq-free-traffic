@@ -1,51 +1,38 @@
 function trafficBifurcation()
-    h = 1.2;                % optimal velocity parameter
+    h = 2.4;                % optimal velocity parameter
     len = 60;               % length of the ring road
-    numCars = 60;           % number of cars
-    mu = .1;                % initial position parameter
-    finalTime = 200000;     % reference state final time
-    
-    tskip = 600;            % times for evolving
-    delta = 2000;           
-    
+    numCars = 30;           % number of cars
+
+    tskip = 100;            % times for evolving
+    delta = 1000;           
     stepSize = .0025;        % step size for the secant line approximation
     delSigma = 0.00001;     % delta sigma used for finite difference of F
     delv0 = 0.00001;        % delta v0 used for finite difference of F
     tolerance = 10^(-7);    % tolerance for Newton's method
     
-    v0_base1 = 0.91;        % initial velocities for secant line approximation
-    v0_base2 = 0.9;
-    
     options = odeset('AbsTol',10^-8,'RelTol',10^-8); % ODE 45 options
-    
-    %% initialize car posoitions and velocities
-    cars_1 = zeros(2*numCars, 1);
-    cars_2 = zeros(2*numCars, 1);
-    for i = 1:numCars
-        cars_1(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
-        cars_1(i+numCars) = optimalVelocity(len/numCars, v0_base1);
-        
-        cars_2(i) = (i-1) * len/numCars + mu*sin(2*pi*i/numCars);
-        cars_2(i+numCars) = optimalVelocity(len/numCars, v0_base2);
-    end
 
-    %% initialize the reference states if not already saved
-    %{
-	[t1,allTime_1] = ode45(@microsystem,[0 finalTime],cars_1, options, v0_base1);
-	ref_1 = allTime_1(end,:)';
-	[t2,allTime_2] = ode45(@microsystem,[0 finalTime],cars_2, options, v0_base2);
-	ref_2 = allTime_2(end,:)';
-	save('refStats.mat','ref_1','ref_2'); % save reference states 
-    %}
-    
     % load the reference states if they have already been calculated
-    load('refStats919.mat','ref_1','ref_2');  
+    load('microBif.mat', 'bif', 'vel');
+    oldBif = bif;
+    
+    start = 105;
+    ref_2 = oldBif(1:numCars, start+1);   % initial profiles
+    ref_1 = oldBif(1:numCars, start);
+    v0_base1 = vel( start);
+    v0_base2 = vel(1 + start);
     
     %% initialize secant continuation
-    steps = 10;                                % number of steps to take around the curve
+    steps = 100;                                % number of steps to take around the curve
     bif = zeros(2,steps);                       % array to hold the bifurcation values
     actuals = zeros(2,steps);
-    sigma_1 = std(getHeadways(ref_1(1:numCars)));      %initial sigma values for secant line approximation
+
+    figure; hold on; % draw the bifurcation diagram
+    scatter(vel(start:end), std(oldBif(1:numCars,start:end)), 200, 'r.');
+    
+    ref_1 = hwayToPos(ref_1);                          % get reference state to position
+    ref_2 = hwayToPos(ref_2);
+    sigma_1 = std(getHeadways(ref_1(1:numCars)));      % initial sigma values for secant line approximation
     sigma_2 = std(getHeadways(ref_2(1:numCars)));
     
     %% pseudo arc length continuation
@@ -58,7 +45,6 @@ function trafficBifurcation()
         u = newGuess;
         first = true;                       % mimic a do-while loop                                
         k=1;                            	% Newton's method counter
-        figure;
         %% Newton and that other guy's method
         while(first ||(norm(invD*[f;neww])>tolerance && k < 20))
             first = false;
@@ -83,14 +69,12 @@ function trafficBifurcation()
         v0_base2 = u(2);
         [sigma_2,ref_2] = ler(u(1),ref_1,tskip+delta,1,u(2));       % find the new reference state
         actuals(:,iEq) = [sigma_2 u(2)];
+        hold on;
+        scatter(u(2), std(getHeadways(ref_2(1:numCars))), 400, 'b.'); drawnow; %% plot the bifurcation diagram
+ 
     end
+    save('origEqFree.mat', 'bif', 'actuals');
 
-    %% plot the bifurcation diagram
-    figure;
-    hold on;
-    scatter(bif(2,:),bif(1,:),'*');
-    scatter(actuals(2,:),actuals(1,:),'o');
-    %save('eqFreeBif.mat','bif');
     
     %% functions
     
@@ -122,29 +106,14 @@ function trafficBifurcation()
     % new_state - the final state of the evolution, which can be used as a
     %               future reference state
     function [sigma,new_state, sigma2, new_state2] = ler(sigma,ref,t,p,v0, tReference)
-        lifted = lift(sigma, p, getHeadways(ref(1:numCars)),v0);
-         [t1,evo] = ode45(@microsystem,[0 t],lifted, options,v0);
-         if (nargin > 5)
-             [t2,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
-             
-            allTimePoints = linspace(0,t, (t)/10);
-            allTimePoints2 = linspace(t,tReference + t, (tReference)/10);
-            evoPoints = interp1(t1, evo, allTimePoints);
-            evoPoints2 = interp1(t2 + t, evo2, allTimePoints2);
-            evoHways = getHeadways(evoPoints(:,1:numCars)');
-            evoHways2 = getHeadways(evoPoints2(:,1:numCars)');
-            evosteve = std(evoHways);
-            evosteve2 = std(evoHways2);
-            clf;
-            hold on;
-            scatter(allTimePoints, evosteve, 'b.');
-            scatter(allTimePoints2, evosteve2, 'r.');
-            hold off;
-            drawnow;
-             sigma2 = std(getHeadways(evo2(end,1:numCars)'));
+        lifted = lift(sigma, p, getHeadways(ref(1:numCars)),v0); %lift
+         [~,evo] = ode45(@microsystem,[0 t],lifted, options,v0); % evolve
+         if (nargin > 5) % evolve for tskip
+             [~,evo2] = ode45(@microsystem,[0 tReference],evo(end,1:2*numCars)',options,v0);
+            sigma2 = std(getHeadways(evo2(end,1:numCars)'));
          end
          evoCars = evo(end, 1:numCars)';
-         sigma = std(getHeadways(evoCars));
+         sigma = std(getHeadways(evoCars)); % restrict
          if(nargout >= 2)
              new_state = evo(end,1:2*numCars)';
          end
@@ -197,12 +166,10 @@ function trafficBifurcation()
         del = p * s/std(hways) * (hways - mean(hways)) + mean(hways);
         new = zeros(length(hways)*2,1);
         for iLift=2:length(hways)
-            new(iLift) = mod(sum(del(1:iLift-1)),len);
+            new(iLift) = sum(del(1:iLift-1));
         end
-        hways = getHeadways(new(1:length(hways)));
-        for iLift=1:length(hways)
-            new(iLift+length(hways)) = optimalVelocity(hways(iLift), v0);
-        end
+        hways = getHeadways(new(1:numCars));
+        new(numCars+1:end) = optimalVelocity(hways, v0);
     end
     
     %% optimal velocity function given in paper
