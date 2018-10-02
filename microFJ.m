@@ -23,9 +23,6 @@ D2 = fourdif(N,2)*(2*pi/M)^2;
 
 e0    = ones(N,1);
 shift = sparse([[N-k+1:N] [1:(N-k)]],1:N,e0,N,N);                               % shift matrix
-e = sparse(1:N,[1:N],e0,N,N);                                                   % identity
-
-z = sparse(N,N);
 
 LN = -c^2*tau*D2+c*D;                              % linear comp. of DE
 LD = D;                                                                %  phase condition matrix
@@ -39,14 +36,7 @@ F = [ LN*u + optimalVelocity(shift*u, v0) - optimalVelocity(u, v0) + mu.*ones(N,
 
 %% optimal veloctiy function
     function v = optimalVelocity(headway,v0)
-        h = 1.2;
+        h = 2.4;
         v = v0 * (tanh(headway - h) + tanh(h));
     end
-
-%% derivative of optimal velocity function
-    function v = optimalVHway(headway,v0)
-        h = 1.2;
-        v = v0 * (sech(headway - h).^2);
-    end
 end
-
