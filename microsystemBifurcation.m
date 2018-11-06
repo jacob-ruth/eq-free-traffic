@@ -44,7 +44,9 @@ steps = 200;
 stepSize = 0.025;
 cguess = -0.8581;
 
-foptions = optimset( 'TolFun',1e-15,'TolX',1e-15, 'Display', 'off');
+foptions = optimoptions(@fsolve, 'TolFun',1e-15,'TolX',1e-15, 'Display', 'off', ...
+    'SpecifyObjectiveGradient', true, 'CheckGradient', true, ...
+    'FiniteDifferenceType', 'central');
 
 [~, max1] = max(hways1);
 [~, max2] = max(hways2);
@@ -97,12 +99,14 @@ scatter(bif(end,:), std(bif(1:numCars,:)),50,'b.');
 % tau       - momentum constant
 % W         - tangent vector
 % initGuess - first guess (point on tangent vector)
-    function fw = FW(var, ref, nCars, len, tau, W, initGuess)
+    function [fw,J] = FW(var, ref, nCars, len, tau, W, initGuess)
         v0 = var(end);
         fw = zeros(nCars*discreteScaling+3,1);
-        fw(1:nCars*discreteScaling+2) = microFJ(var(1:end-1), ref, nCars,...
+        [fw(1:nCars*discreteScaling+2), J1] = microFJ(var(1:end-1), ref, nCars,...
             discreteScaling*nCars , len, v0, tau);
         fw(end) = W' * (var-initGuess);
+        J2 = W';
+        J = [J1 ; J2]; 
     end
 
 %% optimal velocity function given in paper
